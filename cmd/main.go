@@ -104,7 +104,7 @@ func parseFlags() bool {
 
 func parseEnvironmentVariables() (string, int) {
 	tgApiKey := mustGetEnv(DndUtilTgApiKey)
-	timeoutStr := mustGetEnv(DND_UTIL_LONG_POLLING_TIMEOUT)
+	timeoutStr := mustGetEnv(DndUtilLongPollingTimeout)
 	timeout, err := strconv.Atoi(timeoutStr)
 	if err != nil {
 		Logger.Fatalf("timeout environment variable is invalid %s", timeoutStr)

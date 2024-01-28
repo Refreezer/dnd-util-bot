@@ -8,6 +8,6 @@ const (
 type EnvKey string
 
 const (
-	DndUtilTgApiKey               EnvKey = "DndUtilTgApiKey"
-	DND_UTIL_LONG_POLLING_TIMEOUT EnvKey = "DND_UTIL_LONG_POLLING_TIMEOUT"
+	DndUtilTgApiKey           EnvKey = "DND_UTIL_TG_API_KEY"
+	DndUtilLongPollingTimeout EnvKey = "DND_UTIL_LONG_POLLING_TIMEOUT"
 )
