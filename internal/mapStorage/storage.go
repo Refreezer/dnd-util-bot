@@ -25,7 +25,7 @@ func (m *MapStorage) MoveMoneyFromUserToUser(fromId int64, toId int64, amount ui
 	defer m.rwMutex.Unlock()
 	fromBalance, ok := m.userIdToBalance[fromId]
 	if !ok {
-		return fmt.Errorf("no wallet for %d", fromId)
+		return internal.ErrorNotRegistered
 	}
 
 	if fromBalance < amount {
@@ -34,7 +34,7 @@ func (m *MapStorage) MoveMoneyFromUserToUser(fromId int64, toId int64, amount ui
 
 	toBalance, ok := m.userIdToBalance[toId]
 	if !ok {
-		return fmt.Errorf("no wallet for %d", toId)
+		return internal.ErrorNotRegistered
 	}
 
 	m.userIdToBalance[fromId] = fromBalance - amount

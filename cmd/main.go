@@ -7,7 +7,7 @@ import (
 	"github.com/Refreezer/dnd-util-bot/api"
 	"github.com/Refreezer/dnd-util-bot/api/listener"
 	. "github.com/Refreezer/dnd-util-bot/internal"
-	"github.com/Refreezer/dnd-util-bot/internal/mapStorage"
+	"github.com/Refreezer/dnd-util-bot/internal/boltStorage"
 	. "github.com/Refreezer/dnd-util-bot/logging"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/op/go-logging"
@@ -40,6 +40,9 @@ func main() {
 	loggerProvider := &loggerProvider{
 		Debug: debug,
 	}
+	storage, disposeStorage := boltStorage.NewBoltStorage(loggerProvider)
+	defer disposeStorage()
+
 	botListener := listener.NewBotListener(
 		tgBotApi,
 		&listener.Config{
@@ -48,7 +51,7 @@ func main() {
 			UpdateHandler: api.NewDndUtilApi(
 				tgBotApi,
 				loggerProvider,
-				mapStorage.NewMapStorage(),
+				storage,
 			),
 		},
 		loggerProvider,
@@ -101,7 +104,7 @@ func parseFlags() bool {
 
 func parseEnvironmentVariables() (string, int) {
 	tgApiKey := mustGetEnv(DndUtilTgApiKey)
-	timeoutStr := mustGetEnv(DndUtilLongPollingTimeout)
+	timeoutStr := mustGetEnv(DND_UTIL_LONG_POLLING_TIMEOUT)
 	timeout, err := strconv.Atoi(timeoutStr)
 	if err != nil {
 		Logger.Fatalf("timeout environment variable is invalid %s", timeoutStr)

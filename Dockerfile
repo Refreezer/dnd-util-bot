@@ -1,6 +1,5 @@
 FROM golang:1.21
-ENV DndUtilTgApiKey=
-ENV DndUtilLongPollingTimeout=60
+ENV DND_UTIL_LONG_POLLING_TIMEOUT=60
 WORKDIR /app
 COPY go.mod go.sum ./
 COPY / ./

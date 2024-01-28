@@ -11,10 +11,10 @@ const (
 	commandSendMoneyPromptLabel         = "Послать денежку"
 	commandStartLabel                   = "Начать"
 
-	usageMoveMoneyFromUserToUser = "%s @sender @recipient amount"
-	usageSetUserBalance          = "%s @username amount"
+	usageMoveMoneyFromUserToUser = "%s @sender @recipient 123"
+	usageSetUserBalance          = "%s @username 123"
 	usageGetUserBalance          = "%s @username"
-	usageSendMoney               = "%s @username amount"
+	usageSendMoney               = "%s @recipient 123"
 )
 
 var (

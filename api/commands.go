@@ -5,7 +5,7 @@ import tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 const (
 	commandKeyStart                   = "start"
 	commandKeySendMoney               = "send_money"
-	commandKeySendMoneyStart          = "send_money_start"
+	commandKeySendMoneyPrompt         = "send_money_prompt"
 	commandKeyGetBalance              = "get_balance"
 	commandKeyThrowDice               = "throw_dice"
 	commandKeyGetUserBalance          = "get_user_balance"
@@ -16,7 +16,7 @@ const (
 var (
 	groupCommandsMap = map[string]*command{
 		commandKeyStart:                   commandStart,
-		commandKeySendMoneyStart:          commandSendMoneyPrompt,
+		commandKeySendMoneyPrompt:         commandSendMoneyPrompt,
 		commandKeySendMoney:               commandSendMoney,
 		commandKeyGetBalance:              commandGetBalance,
 		commandKeyThrowDice:               commandThrowDice,
