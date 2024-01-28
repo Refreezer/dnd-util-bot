@@ -220,7 +220,7 @@ func (api *dndUtilBotApi) moveMoneyFromUserToUser(upd *tgbotapi.Update) error {
 func (api *dndUtilBotApi) getParams(text string) []string {
 	params := strings.Split(text, " ")
 	params = slices.DeleteFunc(params, func(s string) bool {
-		return strings.HasSuffix(s, api.botName)
+		return strings.HasSuffix(s, api.botName) || s == "" || s == " "
 	})
 
 	return params
