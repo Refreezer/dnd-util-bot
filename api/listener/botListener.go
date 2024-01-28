@@ -4,6 +4,7 @@ import (
 	"context"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/op/go-logging"
+	"runtime"
 	"sync"
 )
 
@@ -49,6 +50,7 @@ func NewBotListener(
 		tgBotApi:     tgBotApi,
 		lastUpdateId: 0,
 		logger:       logger,
+		done:         make(chan struct{}),
 	}
 }
 
@@ -60,7 +62,9 @@ func (l *dndUtilBotListener) ListenForUpdates(ctx context.Context) (ShutDown, er
 	})
 
 	l.updatesChannel = updates
-	go l.eventLoop(ctx)
+	tasks := make(chan *tgbotapi.Update, runtime.NumCPU())
+	go l.eventLoop(ctx, tasks)
+	l.startWorkers(ctx, tasks)
 	return l.waitForShutDown(), nil
 }
 
@@ -70,7 +74,7 @@ func (l *dndUtilBotListener) waitForShutDown() func() {
 	}
 }
 
-func (l *dndUtilBotListener) eventLoop(ctx context.Context) {
+func (l *dndUtilBotListener) eventLoop(ctx context.Context, tasks chan<- *tgbotapi.Update) {
 	defer func() {
 		l.done <- struct{}{}
 	}()
@@ -90,14 +94,31 @@ func (l *dndUtilBotListener) eventLoop(ctx context.Context) {
 			}
 
 			l.lastUpdateId = max(update.UpdateID, l.lastUpdateId)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				l.conf.UpdateHandler.Handle(ctx, &update)
-			}()
+			tasks <- &update
 			continue
-		default:
-			// l.logger.Debugf("idle state")
+		}
+	}
+}
+
+func (l *dndUtilBotListener) startWorkers(ctx context.Context, tasks <-chan *tgbotapi.Update) {
+	for i := 0; i <= runtime.NumCPU(); i++ {
+		go l.worker(ctx, tasks)
+	}
+}
+
+func (l *dndUtilBotListener) worker(ctx context.Context, tasks <-chan *tgbotapi.Update) {
+	for {
+		select {
+		case <-ctx.Done():
+			l.logger.Info("worker exits due to canceled context")
+			return
+		case update, ok := <-tasks:
+			if !ok {
+				l.logger.Info("worker exits due to input channel was closed")
+				return
+			}
+
+			l.conf.UpdateHandler.Handle(ctx, update)
 			continue
 		}
 	}

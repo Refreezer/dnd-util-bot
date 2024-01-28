@@ -75,12 +75,12 @@ func listenOsSignals(signalChannel chan os.Signal, cancel context.CancelFunc) {
 		for {
 			sig := <-sigs
 			switch sig {
-			case os.Interrupt:
-			case syscall.SIGTERM:
+			case os.Interrupt, syscall.SIGTERM, syscall.SIGINT:
 				fmt.Println("Shutting down")
 				cancelFunc()
+				return
 			default:
-				fmt.Println("Unknown sig received.")
+				Logger.Infof("Unknown sig received %s\n", sig.String())
 			}
 		}
 	}(signalChannel, cancel)

@@ -88,13 +88,7 @@ func (api *dndUtilBotApi) handleMessage(upd *tgbotapi.Update) {
 	from := upd.SentFrom()
 	api.registerWallet(from)
 	switch upd.Message.Chat.Type {
-	case ChatTypeGroup:
-		api.executeCommand(upd)
-		break
-	case ChatTypeSuperGroup:
-		api.executeCommand(upd)
-		break
-	case ChatTypePrivate:
+	case ChatTypeGroup, ChatTypeSuperGroup, ChatTypePrivate:
 		api.executeCommand(upd)
 		break
 	case ChatChannel: // not supported
@@ -220,7 +214,9 @@ func (api *dndUtilBotApi) moveMoneyFromUserToUser(upd *tgbotapi.Update) error {
 func (api *dndUtilBotApi) getParams(text string) []string {
 	params := strings.Split(text, " ")
 	params = slices.DeleteFunc(params, func(s string) bool {
-		return strings.HasSuffix(s, api.botName) || s == "" || s == " "
+		return api.botName == s ||
+			(len(s) > 0 && s[0] == '@' && s[1:] == api.botName) ||
+			s == "" || s == " "
 	})
 
 	return params

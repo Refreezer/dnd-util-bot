@@ -4,12 +4,12 @@ import tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 const (
 	commandKeyStart                   = "start"
-	commandKeySendMoney               = "sendMoney"
-	commandKeyGetBalance              = "getBalance"
-	commandKeyThrowDice               = "throwDice"
-	commandKeyGetUserBalance          = "getUserBalance"
-	commandKeySetUserBalance          = "setUserBalance"
-	commandKeyMoveMoneyFromUserToUser = "moveMoneyFromUserToUser"
+	commandKeySendMoney               = "send_money"
+	commandKeyGetBalance              = "get_balance"
+	commandKeyThrowDice               = "throw_dice"
+	commandKeyGetUserBalance          = "get_user_balance"
+	commandKeySetUserBalance          = "set_user_balance"
+	commandKeyMoveMoneyFromUserToUser = "move_money_from_user_to_user"
 )
 
 var (
