@@ -22,9 +22,36 @@ const (
 	ChatMemberStatusAdministrator = "administrator"
 )
 
+var d20NumToEmojiMap = map[int]string{
+	1:  "1️⃣",
+	2:  "2️⃣",
+	3:  "3️⃣",
+	4:  "4️⃣",
+	5:  "5️⃣",
+	6:  "6️⃣",
+	7:  "7️⃣",
+	8:  "8️⃣",
+	9:  "9️⃣",
+	10: "🔟",
+	11: "🆙",
+	12: "🆗",
+	13: "🔡",
+	14: "🔢",
+	15: "🔤",
+	16: "🅰️",
+	17: "🆎",
+	18: "🅱️",
+	19: "🆑",
+	20: "🆒",
+}
+
 type (
 	DndUtilApi interface {
 		listener.UpdateHandler
+	}
+
+	ResourceProvider interface {
+		get(uri string) ([]byte, error)
 	}
 
 	Storage interface {
@@ -45,7 +72,8 @@ type (
 		commands   *commands
 		storage    Storage
 		randomizer *rand.Rand
-		botName    string
+		//resourceProvider ResourceProvider
+		botName string
 	}
 )
 
@@ -53,14 +81,21 @@ func NewDndUtilApi(
 	tgBotApi *tgbotapi.BotAPI,
 	loggerProvider LoggerProvider,
 	storage Storage,
+	// resourceProvider ResourceProvider,
 ) DndUtilApi {
-	return newDndUtilApi(tgBotApi, loggerProvider, storage)
+	return newDndUtilApi(
+		tgBotApi,
+		loggerProvider,
+		storage,
+		//resourceProvider,
+	)
 }
 
 func newDndUtilApi(
 	tgBotApi *tgbotapi.BotAPI,
 	loggerProvider LoggerProvider,
 	storage Storage,
+	// resourceProvider ResourceProvider,
 ) *dndUtilBotApi {
 	api := &dndUtilBotApi{
 		tgBotApi:   tgBotApi,
@@ -68,6 +103,7 @@ func newDndUtilApi(
 		storage:    storage,
 		randomizer: rand.New(rand.NewSource(time.Now().Unix())),
 		botName:    "DnDUtilTest_bot",
+		//resourceProvider: resourceProvider,
 	}
 
 	api.commands = newCommands(api)
@@ -81,7 +117,7 @@ func (api *dndUtilBotApi) Handle(ctx context.Context, upd *tgbotapi.Update) {
 }
 
 func (api *dndUtilBotApi) handleMessage(upd *tgbotapi.Update) {
-	if upd.Message == nil || upd.Message.Chat == nil || upd.Message.From == nil || upd.Message.Text == "" {
+	if upd.Message == nil || upd.Message.Chat == nil || upd.Message.From == nil {
 		return
 	}
 
@@ -120,21 +156,20 @@ func (api *dndUtilBotApi) executeCommand(upd *tgbotapi.Update) {
 	}
 }
 
-func (api *dndUtilBotApi) replyWithRightsViolation(upd *tgbotapi.Update) {
+func (api *dndUtilBotApi) messageRightsViolation(upd *tgbotapi.Update) *tgbotapi.MessageConfig {
 	msg := tgbotapi.NewMessage(upd.Message.Chat.ID, messageRejectedRightsViolation)
-	api.replyWithMessage(upd, &msg)
+	return &msg
 }
 
-func (api *dndUtilBotApi) replyWithNotImplemented(upd *tgbotapi.Update) {
+func (api *dndUtilBotApi) messageNotImplemented(upd *tgbotapi.Update) *tgbotapi.MessageConfig {
 	msg := tgbotapi.NewMessage(upd.Message.Chat.ID, messageNotImplemented)
-	api.replyWithMessage(upd, &msg)
+	return &msg
 }
 
-func (api *dndUtilBotApi) replyWithMessage(upd *tgbotapi.Update, msg *tgbotapi.MessageConfig) {
-	msg.ReplyToMessageID = upd.Message.MessageID
-	_, err := api.tgBotApi.Send(msg)
+func (api *dndUtilBotApi) sendToChat(chatable tgbotapi.Chattable) {
+	_, err := api.tgBotApi.Send(chatable)
 	if err != nil {
-		api.logger.Errorf("can't reply with message %s error: %s", msg, err)
+		api.logger.Errorf("can't reply with message %s error: %s", chatable, err)
 		return
 	}
 }
@@ -163,52 +198,65 @@ func (api *dndUtilBotApi) getMember(chatID int64, userID int64) (tgbotapi.ChatMe
 	return member, err
 }
 
-func (api *dndUtilBotApi) userIdByUserNameAndReplyIfCant(userName string, upd *tgbotapi.Update) (int64, bool) {
+func (api *dndUtilBotApi) isUserRegistered(userName string) bool {
+	_, ok := api.getIdByUserNameSanitized(userName)
+	return ok
+}
+
+func (api *dndUtilBotApi) userIdByUserName(userName string, upd *tgbotapi.Update) (int64, bool) {
+	uid, ok := api.getIdByUserNameSanitized(userName)
+	return uid, ok
+}
+
+func (api *dndUtilBotApi) getIdByUserNameSanitized(userName string) (int64, bool) {
 	sanitizedUserName := strings.Replace(userName, "@", "", 1)
 	uid, ok := api.storage.GetIdByUserName(sanitizedUserName)
+	return uid, ok
+}
+
+func (api *dndUtilBotApi) moveMoneyFromUserToUser(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
+	params := api.getParams(upd.Message.Text)
+	if len(params) < 4 {
+		return nil, fmt.Errorf("inalid MoveMoneyFromUserToUser command parameters")
+	}
+
+	amount, err := strconv.Atoi(params[3])
+	if err != nil {
+		return nil, fmt.Errorf("can't convert money amount toId integer %w", err)
+	}
+
+	userName := params[1]
+	fromId, ok := api.userIdByUserName(userName, upd)
 	if !ok {
 		msg := tgbotapi.NewMessage(
 			upd.Message.Chat.ID,
 			fmt.Sprintf(messageNotRegistered, userName),
 		)
 
-		api.replyWithMessage(upd, &msg)
+		return &msg, nil
 	}
 
-	return uid, ok
-}
-
-func (api *dndUtilBotApi) moveMoneyFromUserToUser(upd *tgbotapi.Update) error {
-	params := api.getParams(upd.Message.Text)
-	if len(params) < 4 {
-		return fmt.Errorf("inalid MoveMoneyFromUserToUser command parameters")
-	}
-
-	amount, err := strconv.Atoi(params[3])
-	if err != nil {
-		return fmt.Errorf("can't convert money amount toId integer %w", err)
-	}
-
-	fromId, ok := api.userIdByUserNameAndReplyIfCant(params[1], upd)
+	to := params[2]
+	toId, ok := api.userIdByUserName(to, upd)
 	if !ok {
-		return nil
-	}
+		msg := tgbotapi.NewMessage(
+			upd.Message.Chat.ID,
+			fmt.Sprintf(messageNotRegistered, to),
+		)
 
-	toId, ok := api.userIdByUserNameAndReplyIfCant(params[2], upd)
-	if !ok {
-		return nil
+		return &msg, nil
 	}
 
 	if fromId == toId {
-		return fmt.Errorf("can't make transaction from sender acc to itself")
+		return nil, fmt.Errorf("can't make transaction from sender acc to itself")
 	}
 
 	err = api.storage.MoveMoneyFromUserToUser(fromId, toId, uint(amount))
 	if err != nil {
-		return fmt.Errorf("error during MoveMoneyFromUserToUser %w", err)
+		return nil, fmt.Errorf("error during MoveMoneyFromUserToUser %w", err)
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (api *dndUtilBotApi) getParams(text string) []string {
@@ -222,130 +270,166 @@ func (api *dndUtilBotApi) getParams(text string) []string {
 	return params
 }
 
-func (api *dndUtilBotApi) setUserBalance(upd *tgbotapi.Update) error {
+func (api *dndUtilBotApi) setUserBalance(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
 	params := api.getParams(upd.Message.Text)
 	if len(params) < 3 {
-		return fmt.Errorf("inalid setUserBalance command parameters")
+		return nil, fmt.Errorf("inalid setUserBalance command parameters")
 	}
 
 	amount, err := strconv.Atoi(params[2])
 	if err != nil {
-		return fmt.Errorf("can't convert money amount to integer %w", err)
+		return nil, fmt.Errorf("can't convert money amount to integer %w", err)
 	}
 
 	userName := params[1]
-	userId, ok := api.userIdByUserNameAndReplyIfCant(userName, upd)
+	userId, ok := api.userIdByUserName(userName, upd)
 	if !ok {
-		return nil
+		msg := tgbotapi.NewMessage(
+			upd.Message.Chat.ID,
+			fmt.Sprintf(messageNotRegistered, userName),
+		)
+
+		return &msg, nil
 	}
 
 	err = api.storage.SetUserBalance(userId, uint(amount))
 	if err != nil {
-		return fmt.Errorf("error during setUserBalance %w", err)
+		return nil, fmt.Errorf("error during setUserBalance %w", err)
 	}
 
 	msg := tgbotapi.NewMessage(upd.Message.Chat.ID, fmt.Sprintf(messageSetUserBalanceSuccess, userName, amount))
-	api.replyWithMessage(upd, &msg)
-	return err
+	return &msg, err
 }
 
-func (api *dndUtilBotApi) getUserBalance(upd *tgbotapi.Update) error {
+func (api *dndUtilBotApi) getUserBalance(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
 	params := api.getParams(upd.Message.Text)
 	if len(params) < 2 {
-		return fmt.Errorf("inalid GetUserBalance command parameters")
+		return nil, fmt.Errorf("inalid GetUserBalance command parameters")
 	}
 
 	userName := params[1]
-	userId, ok := api.userIdByUserNameAndReplyIfCant(userName, upd)
+	userId, ok := api.userIdByUserName(userName, upd)
 	if !ok {
-		return nil
+		msg := tgbotapi.NewMessage(
+			upd.Message.Chat.ID,
+			fmt.Sprintf(messageNotRegistered, userName),
+		)
+
+		return &msg, nil
 	}
 
 	balance, err := api.storage.GetUserBalance(userId)
 	if err != nil {
-		return fmt.Errorf("error during getting balance from storage %w", err)
+		return nil, fmt.Errorf("error during getting balance from storage %w", err)
 	}
 
 	msg := tgbotapi.NewMessage(upd.Message.Chat.ID, fmt.Sprintf(messageGetUserBalanceSuccess, userName, balance))
-	api.replyWithMessage(upd, &msg)
-	return nil
+	return &msg, nil
 }
 
-func (api *dndUtilBotApi) throwDice(upd *tgbotapi.Update) error {
-	msg := tgbotapi.NewMessage(
-		upd.Message.Chat.ID,
-		fmt.Sprintf(messageThrowDice, api.randomizer.Intn(20)+1),
-	)
-
-	api.replyWithMessage(upd, &msg)
-	return nil
+func (api *dndUtilBotApi) throwDice(upd *tgbotapi.Update) (*tgbotapi.StickerConfig, error) {
+	return api.stickerThrowDice(upd)
 }
 
-func (api *dndUtilBotApi) getBalance(upd *tgbotapi.Update) error {
-	balance, err := api.storage.GetUserBalance(upd.SentFrom().ID)
-	if err != nil {
-		return fmt.Errorf("error during getBalance from storage %w", err)
+func (api *dndUtilBotApi) stickerThrowDice(upd *tgbotapi.Update) (*tgbotapi.StickerConfig, error) {
+	d20 := api.randomizer.Intn(20) + 1
+	emoji, ok := d20NumToEmojiMap[d20]
+	if !ok {
+		return nil, fmt.Errorf("error getting d20 emoji mapping")
 	}
 
+	set, err := api.tgBotApi.GetStickerSet(tgbotapi.GetStickerSetConfig{
+		Name: "D20STUMP",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, sticker := range set.Stickers {
+		if sticker.Emoji != emoji {
+			continue
+		}
+
+		stickerConfig := tgbotapi.NewSticker(upd.FromChat().ID, tgbotapi.FileID(sticker.FileID))
+		return &stickerConfig, nil
+	}
+
+	return nil, fmt.Errorf("error getting d20 sticker from emoji mapping %d - %s", d20, emoji)
+}
+
+func (api *dndUtilBotApi) getBalance(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
+	balance, err := api.storage.GetUserBalance(upd.SentFrom().ID)
+	if err != nil {
+		return nil, fmt.Errorf("error during getBalance from storage %w", err)
+	}
+
+	return api.messageGetUserBalanceSuccess(upd, balance), nil
+}
+
+func (api *dndUtilBotApi) messageGetUserBalanceSuccess(upd *tgbotapi.Update, balance uint) *tgbotapi.MessageConfig {
 	msg := tgbotapi.NewMessage(
 		upd.Message.Chat.ID,
 		fmt.Sprintf(messageGetUserBalanceSuccess, upd.SentFrom().UserName, balance),
 	)
 
-	api.replyWithMessage(upd, &msg)
-	return nil
+	return &msg
 }
 
-func (api *dndUtilBotApi) sendMoney(upd *tgbotapi.Update) error {
+func (api *dndUtilBotApi) sendMoney(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
 	params := api.getParams(upd.Message.Text)
 	if len(params) < 3 {
-		return fmt.Errorf("inalid MoveMoneyFromUserToUser command parameters")
+		return nil, fmt.Errorf("inalid MoveMoneyFromUserToUser command parameters")
 	}
 
 	amount, err := strconv.Atoi(params[2])
 	if err != nil {
-		return fmt.Errorf("can't convert money amount toId integer %w", err)
+		return nil, fmt.Errorf("can't convert money amount toId integer %w", err)
 	}
 
 	from := upd.SentFrom()
 	fromId := from.ID
 	to := params[1]
-	toId, ok := api.userIdByUserNameAndReplyIfCant(to, upd)
+	toId, ok := api.userIdByUserName(to, upd)
 	if !ok {
-		return nil
+		msg := tgbotapi.NewMessage(
+			upd.Message.Chat.ID,
+			fmt.Sprintf(messageNotRegistered, to),
+		)
+
+		return &msg, nil
 	}
 
 	err = api.storage.MoveMoneyFromUserToUser(fromId, toId, uint(amount))
 	if err != nil {
-		return fmt.Errorf("error during MoveMoneyFromUserToUser %w", err)
+		return nil, fmt.Errorf("error during MoveMoneyFromUserToUser %w", err)
 	}
 
+	return api.messageSendMoney(upd, amount, from, to), nil
+}
+
+func (api *dndUtilBotApi) messageSendMoney(upd *tgbotapi.Update, amount int, from *tgbotapi.User, to string) *tgbotapi.MessageConfig {
 	msg := tgbotapi.NewMessage(
 		upd.FromChat().ID,
 		fmt.Sprintf(messageSendMoney, amount, fmt.Sprintf("@%s", from), to),
 	)
-	api.replyWithMessage(upd, &msg)
-	return nil
+	return &msg
 }
 
-func (api *dndUtilBotApi) notImplemented(upd *tgbotapi.Update) error {
-	api.replyWithNotImplemented(upd)
-	return nil
+func (api *dndUtilBotApi) notImplemented(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
+	return api.messageNotImplemented(upd), nil
 }
 
-func (api *dndUtilBotApi) rightsViolation(upd *tgbotapi.Update) error {
-	api.replyWithRightsViolation(upd)
-	return nil
+func (api *dndUtilBotApi) rightsViolation(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
+	return api.messageRightsViolation(upd), nil
 }
 
-func (api *dndUtilBotApi) start(upd *tgbotapi.Update) error {
+func (api *dndUtilBotApi) start(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
 	chat := upd.FromChat()
 	balance, err := api.storage.GetUserBalance(upd.SentFrom().ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	msg := tgbotapi.NewMessage(chat.ID, fmt.Sprintf(messageStart, balance))
-	api.replyWithMessage(upd, &msg)
-	return nil
+	return &msg, nil
 }

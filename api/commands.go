@@ -14,17 +14,17 @@ const (
 
 var (
 	groupCommandsMap = map[string]*command{
-		commandKeyStart:                   {handlerStart, false},
-		commandKeySendMoney:               {handlerSendMoney, false},
-		commandKeyGetBalance:              {handlerGetBalance, false},
-		commandKeyThrowDice:               {handlerThrowDice, false},
-		commandKeyGetUserBalance:          {handlerGetUserBalance, true},
-		commandKeySetUserBalance:          {handlerSetUserBalance, true},
-		commandKeyMoveMoneyFromUserToUser: {handlerMoveMoneyFromUserToUser, true},
+		commandKeyStart:                   commandStart,
+		commandKeySendMoney:               commandSendMoney,
+		commandKeyGetBalance:              commandGetBalance,
+		commandKeyThrowDice:               commandThrowDice,
+		commandKeyGetUserBalance:          commandGetUserBalance,
+		commandKeySetUserBalance:          commandSetUserBalance,
+		commandKeyMoveMoneyFromUserToUser: commandMoveMoneyFromUserToUser,
 	}
 
 	privateCommandsMap = map[string]*command{
-		commandKeyStart: {handlerStart, false},
+		commandKeyStart: commandStart,
 	}
 
 	chatTypeToCommandMap = map[string]map[string]*command{
@@ -32,10 +32,6 @@ var (
 		ChatTypeSuperGroup: groupCommandsMap,
 		ChatTypePrivate:    privateCommandsMap,
 	}
-
-	commandNotImplemented  = &command{handlerNotImplemented, false}
-	commandRightsViolation = &command{handlerRightsViolation, false}
-	commandCanNotResolve   = &command{handlerCantResolve, false}
 )
 
 type (
@@ -43,9 +39,11 @@ type (
 		api *dndUtilBotApi
 	}
 
-	command struct {
-		handler          func(api *dndUtilBotApi, upd *tgbotapi.Update) error
+	commandHandler func(api *dndUtilBotApi, upd *tgbotapi.Update) (tgbotapi.Chattable, error)
+	command        struct {
+		handler          commandHandler
 		needsAdminRights bool
+		label            string
 	}
 
 	builtUpCommand struct {
@@ -76,7 +74,10 @@ func (c *commands) resolve(upd *tgbotapi.Update) *command {
 
 	cmd, ok := commandsMap[commandKey]
 	if !ok {
-		return commandNotImplemented
+		cmd, ok = c.findCommandByLabel(upd.Message.Text, commandsMap)
+		if !ok {
+			return commandCanNotResolve
+		}
 	}
 
 	if cmd.needsAdminRights {
@@ -91,6 +92,15 @@ func (c *commands) resolve(upd *tgbotapi.Update) *command {
 	}
 
 	return cmd
+}
+
+func (c *commands) findCommandByLabel(messageText string, commandsMap map[string]*command) (*command, bool) {
+	for _, command := range commandsMap {
+		if command.label == messageText {
+			return command, true
+		}
+	}
+	return nil, false
 }
 
 func (c *command) build(api *dndUtilBotApi) *builtUpCommand {
@@ -109,50 +119,15 @@ func (buc *builtUpCommand) execute(upd *tgbotapi.Update) error {
 func (c *command) newBuiltUpCommand(api *dndUtilBotApi) *builtUpCommand {
 	return &builtUpCommand{
 		handler: func(upd *tgbotapi.Update) error {
-			err := c.handler(api, upd)
+			chatable, err := c.handler(api, upd)
 			if err != nil {
 				api.logger.Errorf("error on executing command handler %s", err)
 			}
+
+			if chatable != nil {
+				api.sendToChat(chatable)
+			}
+
 			return err
 		}}
-}
-
-func handlerMoveMoneyFromUserToUser(api *dndUtilBotApi, upd *tgbotapi.Update) error {
-	return api.moveMoneyFromUserToUser(upd)
-}
-
-func handlerSetUserBalance(api *dndUtilBotApi, upd *tgbotapi.Update) error {
-	return api.setUserBalance(upd)
-}
-
-func handlerGetUserBalance(api *dndUtilBotApi, upd *tgbotapi.Update) error {
-	return api.getUserBalance(upd)
-}
-
-func handlerThrowDice(api *dndUtilBotApi, upd *tgbotapi.Update) error {
-	return api.throwDice(upd)
-}
-
-func handlerGetBalance(api *dndUtilBotApi, upd *tgbotapi.Update) error {
-	return api.getBalance(upd)
-}
-
-func handlerSendMoney(api *dndUtilBotApi, upd *tgbotapi.Update) error {
-	return api.sendMoney(upd)
-}
-
-func handlerNotImplemented(api *dndUtilBotApi, upd *tgbotapi.Update) error {
-	return api.notImplemented(upd)
-}
-
-func handlerRightsViolation(api *dndUtilBotApi, upd *tgbotapi.Update) error {
-	return api.rightsViolation(upd)
-}
-
-func handlerCantResolve(_ *dndUtilBotApi, _ *tgbotapi.Update) error {
-	return nil
-}
-
-func handlerStart(api *dndUtilBotApi, upd *tgbotapi.Update) error {
-	return api.start(upd)
 }
