@@ -2,7 +2,7 @@ package mapStorage
 
 import (
 	"fmt"
-	"github.com/Refreezer/dnd-util-bot/internal"
+	"github.com/Refreezer/dnd-util-bot/api"
 	"sync"
 )
 
@@ -25,16 +25,16 @@ func (m *MapStorage) MoveMoneyFromUserToUser(fromId int64, toId int64, amount ui
 	defer m.rwMutex.Unlock()
 	fromBalance, ok := m.userIdToBalance[fromId]
 	if !ok {
-		return internal.ErrorNotRegistered
+		return api.ErrorNotRegistered
 	}
 
 	if fromBalance < amount {
-		return internal.ErrorInsufficientMoney
+		return api.ErrorInsufficientMoney
 	}
 
 	toBalance, ok := m.userIdToBalance[toId]
 	if !ok {
-		return internal.ErrorNotRegistered
+		return api.ErrorNotRegistered
 	}
 
 	m.userIdToBalance[fromId] = fromBalance - amount

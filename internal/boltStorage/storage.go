@@ -7,6 +7,7 @@ import (
 	"github.com/Refreezer/dnd-util-bot/internal"
 	"github.com/boltdb/bolt"
 	"github.com/op/go-logging"
+	"math"
 	"os"
 	"time"
 )
@@ -31,6 +32,7 @@ type BoltStorage struct {
 
 func NewBoltStorage(provider api.LoggerProvider) (storage *BoltStorage, close func()) {
 	logger := provider.MustGetLogger("boltStorage")
+	logger.Infof("Db path is %s", DBName)
 	db, err := bolt.Open(DBName, 0600, &bolt.Options{Timeout: 1 * time.Second})
 	Init(db, logger)
 	if err != nil {
@@ -104,20 +106,29 @@ func (b *BoltStorage) MoveMoneyFromUserToUser(fromId int64, toId int64, amount u
 		fromIdKey := int64ToByteArr(fromId)
 		fromBalanceBytes := bucket.Get(fromIdKey)
 		if fromBalanceBytes == nil {
-			return internal.ErrorNotRegistered
+			return api.ErrorNotRegistered
 		}
 
 		toIdKey := int64ToByteArr(toId)
 		toBalanceBytes := bucket.Get(toIdKey)
 		if toBalanceBytes == nil {
-			return internal.ErrorNotRegistered
+			return api.ErrorNotRegistered
 		}
 
 		fromBalance := uintFromByteArr(fromBalanceBytes)
 		toBalance := uintFromByteArr(toBalanceBytes)
-		err := bucket.Put(fromIdKey, uintToByteArr(fromBalance-amount))
+		if fromBalance < amount {
+			return api.ErrorInsufficientMoney
+		}
+
+		newFromBalanceBytes := uintToByteArr(fromBalance - amount)
+		err := bucket.Put(fromIdKey, newFromBalanceBytes)
 		if err != nil {
 			return err
+		}
+
+		if amount > math.MaxUint32-toBalance {
+			return api.ErrorBalanceOverflow
 		}
 
 		err = bucket.Put(toIdKey, uintToByteArr(amount+toBalance))
@@ -136,6 +147,14 @@ func (b *BoltStorage) MoveMoneyFromUserToUser(fromId int64, toId int64, amount u
 }
 
 func (b *BoltStorage) SetUserBalance(userId int64, amount uint) error {
+	if amount < 0 {
+		return api.ErrorInsufficientMoney
+	}
+
+	if amount > math.MaxUint32 {
+		return api.ErrorBalanceOverflow
+	}
+
 	return b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(userIdToBalanceBucketKey)
 		userIdKey := int64ToByteArr(userId)
@@ -150,14 +169,14 @@ func (b *BoltStorage) GetUserBalance(userId int64) (uint, error) {
 		userIdKey := int64ToByteArr(userId)
 		balanceBytes := bucket.Get(userIdKey)
 		if balanceBytes == nil {
-			return internal.ErrorNotRegistered
+			return api.ErrorNotRegistered
 		}
 
 		balance = uintFromByteArr(balanceBytes)
 		return nil
 	})
 
-	if err != nil && !errors.Is(err, internal.ErrorNotRegistered) {
+	if err != nil && !errors.Is(err, api.ErrorNotRegistered) {
 		b.logger.Errorf("error while GetUserBalance: %s", err)
 	}
 
@@ -169,7 +188,7 @@ func (b *BoltStorage) GetIdByUserName(userName string) (userId int64, ok bool) {
 		bucket := tx.Bucket(userNameToUserIdBucketKey)
 		userIdBytes := bucket.Get([]byte(userName))
 		if userIdBytes == nil {
-			return internal.ErrorNotRegistered
+			return api.ErrorNotRegistered
 		}
 
 		userId = int64FromByteArr(userIdBytes)
@@ -177,7 +196,7 @@ func (b *BoltStorage) GetIdByUserName(userName string) (userId int64, ok bool) {
 		return nil
 	})
 
-	if err != nil && !errors.Is(err, internal.ErrorNotRegistered) {
+	if err != nil && !errors.Is(err, api.ErrorNotRegistered) {
 		b.logger.Errorf("error while GetIdByUserName: %s", err)
 		return 0, false
 	}

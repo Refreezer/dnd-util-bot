@@ -172,6 +172,10 @@ func (api *dndUtilBotApi) executeCommand(upd *tgbotapi.Update) {
 		msg = api.plainMessage(chatID, errorMessageInvalidIntegerParameter)
 	} else if errors.Is(err, ErrorInvalidTransactionParameters) {
 		msg = api.plainMessage(chatID, errorMessageInvalidTransactionParameters)
+	} else if errors.Is(err, ErrorInsufficientMoney) {
+		msg = api.plainMessage(chatID, errorMessageInsufficientPounds)
+	} else if errors.Is(err, ErrorBalanceOverflow) {
+		msg = api.plainMessage(chatID, errorMessageBalanceOverflow)
 	}
 
 	if msg == nil {
@@ -473,7 +477,7 @@ func (api *dndUtilBotApi) start(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, 
 }
 
 func (api *dndUtilBotApi) sendMoneyPrompt(upd *tgbotapi.Update) (tgbotapi.Chattable, error) {
-	msg := tgbotapi.NewMessage(upd.FromChat().ID, messageSendMoneyPrompt)
+	msg := tgbotapi.NewMessage(upd.FromChat().ID, fmt.Sprintf(messageSendMoneyPrompt, commandSendMoney.usage))
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
 	return &msg, nil
 }
