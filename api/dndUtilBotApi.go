@@ -182,6 +182,8 @@ func (api *dndUtilBotApi) executeCommand(upd *tgbotapi.Update) {
 		msg = api.plainMessage(chatID, errorMessageInsufficientPounds)
 	} else if errors.Is(err, ErrorBalanceOverflow) {
 		msg = api.plainMessage(chatID, errorMessageBalanceOverflow)
+	} else if errors.Is(err, ErrorUsernameHidden) {
+		msg = api.plainMessage(chatID, messageUsernameHidden)
 	}
 
 	if msg == nil {
