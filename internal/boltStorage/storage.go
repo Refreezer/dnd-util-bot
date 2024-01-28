@@ -7,11 +7,12 @@ import (
 	"github.com/Refreezer/dnd-util-bot/internal"
 	"github.com/boltdb/bolt"
 	"github.com/op/go-logging"
+	"os"
 	"time"
 )
 
-const (
-	DBName = "data/dndUtil.db"
+var (
+	DBName = os.Getenv(string(internal.DndUtilDbPath))
 )
 
 var (
