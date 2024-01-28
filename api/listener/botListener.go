@@ -97,7 +97,7 @@ func (l *dndUtilBotListener) eventLoop(ctx context.Context) {
 			}()
 			continue
 		default:
-			l.logger.Debugf("idle state")
+			// l.logger.Debugf("idle state")
 			continue
 		}
 	}

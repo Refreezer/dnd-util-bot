@@ -7,6 +7,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/op/go-logging"
 	"math/rand"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -15,7 +16,7 @@ import (
 const (
 	ChatTypeGroup                 = "group"
 	ChatTypeSuperGroup            = "supergroup"
-	ChatPrivate                   = "private"
+	ChatTypePrivate               = "private"
 	ChatChannel                   = "channel"
 	ChatMemberCreator             = "creator"
 	ChatMemberStatusAdministrator = "administrator"
@@ -44,6 +45,7 @@ type (
 		commands   *commands
 		storage    Storage
 		randomizer *rand.Rand
+		botName    string
 	}
 )
 
@@ -65,6 +67,7 @@ func newDndUtilApi(
 		logger:     loggerProvider.MustGetLogger("dndUtilBotApi"),
 		storage:    storage,
 		randomizer: rand.New(rand.NewSource(time.Now().Unix())),
+		botName:    "DnDUtilTest_bot",
 	}
 
 	api.commands = newCommands(api)
@@ -78,23 +81,21 @@ func (api *dndUtilBotApi) Handle(ctx context.Context, upd *tgbotapi.Update) {
 }
 
 func (api *dndUtilBotApi) handleMessage(upd *tgbotapi.Update) {
-	if upd.Message == nil || upd.Message.Chat == nil || upd.Message.From == nil {
+	if upd.Message == nil || upd.Message.Chat == nil || upd.Message.From == nil || upd.Message.Text == "" {
 		return
 	}
 
 	from := upd.SentFrom()
-	err := api.storage.SaveUserNameToUserIdMapping(from.UserName, from.ID)
-	if err != nil {
-		api.logger.Errorf("couldn't save user id mapping for %v", from)
-	}
-
+	api.registerWallet(from)
 	switch upd.Message.Chat.Type {
 	case ChatTypeGroup:
-	case ChatTypeSuperGroup:
-		api.handleChatTypeGroup(upd)
+		api.executeCommand(upd)
 		break
-	case ChatPrivate:
-		api.handleChatTypePrivate(upd)
+	case ChatTypeSuperGroup:
+		api.executeCommand(upd)
+		break
+	case ChatTypePrivate:
+		api.executeCommand(upd)
 		break
 	case ChatChannel: // not supported
 	default:
@@ -102,7 +103,23 @@ func (api *dndUtilBotApi) handleMessage(upd *tgbotapi.Update) {
 	}
 }
 
-func (api *dndUtilBotApi) handleChatTypeGroup(upd *tgbotapi.Update) {
+func (api *dndUtilBotApi) registerWallet(from *tgbotapi.User) {
+	if _, ok := api.storage.GetIdByUserName(from.UserName); ok {
+		return
+	}
+
+	err := api.storage.SaveUserNameToUserIdMapping(from.UserName, from.ID)
+	if err != nil {
+		api.logger.Errorf("couldn't save user id mapping for %v", from)
+	}
+
+	err = api.storage.SetUserBalance(from.ID, 0)
+	if err != nil {
+		api.logger.Errorf("couldn't set balance for %v", from)
+	}
+}
+
+func (api *dndUtilBotApi) executeCommand(upd *tgbotapi.Update) {
 	err := api.commands.resolve(upd).build(api).execute(upd)
 	if err != nil {
 		api.logger.Errorf("couldn't execute command %s", err)
@@ -112,10 +129,6 @@ func (api *dndUtilBotApi) handleChatTypeGroup(upd *tgbotapi.Update) {
 func (api *dndUtilBotApi) replyWithRightsViolation(upd *tgbotapi.Update) {
 	msg := tgbotapi.NewMessage(upd.Message.Chat.ID, messageRejectedRightsViolation)
 	api.replyWithMessage(upd, &msg)
-}
-
-func (api *dndUtilBotApi) handleChatTypePrivate(upd *tgbotapi.Update) {
-	api.replyWithNotImplemented(upd)
 }
 
 func (api *dndUtilBotApi) replyWithNotImplemented(upd *tgbotapi.Update) {
@@ -157,11 +170,12 @@ func (api *dndUtilBotApi) getMember(chatID int64, userID int64) (tgbotapi.ChatMe
 }
 
 func (api *dndUtilBotApi) userIdByUserNameAndReplyIfCant(userName string, upd *tgbotapi.Update) (int64, bool) {
-	uid, ok := api.storage.GetIdByUserName(userName)
+	sanitizedUserName := strings.Replace(userName, "@", "", 1)
+	uid, ok := api.storage.GetIdByUserName(sanitizedUserName)
 	if !ok {
 		msg := tgbotapi.NewMessage(
 			upd.Message.Chat.ID,
-			fmt.Sprintf(messageThrowDice, api.randomizer.Int()),
+			fmt.Sprintf(messageNotRegistered, userName),
 		)
 
 		api.replyWithMessage(upd, &msg)
@@ -171,7 +185,7 @@ func (api *dndUtilBotApi) userIdByUserNameAndReplyIfCant(userName string, upd *t
 }
 
 func (api *dndUtilBotApi) moveMoneyFromUserToUser(upd *tgbotapi.Update) error {
-	params := strings.Split(upd.Message.Text, " ")
+	params := api.getParams(upd.Message.Text)
 	if len(params) < 4 {
 		return fmt.Errorf("inalid MoveMoneyFromUserToUser command parameters")
 	}
@@ -191,6 +205,10 @@ func (api *dndUtilBotApi) moveMoneyFromUserToUser(upd *tgbotapi.Update) error {
 		return nil
 	}
 
+	if fromId == toId {
+		return fmt.Errorf("can't make transaction from sender acc to itself")
+	}
+
 	err = api.storage.MoveMoneyFromUserToUser(fromId, toId, uint(amount))
 	if err != nil {
 		return fmt.Errorf("error during MoveMoneyFromUserToUser %w", err)
@@ -199,8 +217,17 @@ func (api *dndUtilBotApi) moveMoneyFromUserToUser(upd *tgbotapi.Update) error {
 	return nil
 }
 
+func (api *dndUtilBotApi) getParams(text string) []string {
+	params := strings.Split(text, " ")
+	params = slices.DeleteFunc(params, func(s string) bool {
+		return strings.HasSuffix(s, api.botName)
+	})
+
+	return params
+}
+
 func (api *dndUtilBotApi) setUserBalance(upd *tgbotapi.Update) error {
-	params := strings.Split(upd.Message.Text, " ")
+	params := api.getParams(upd.Message.Text)
 	if len(params) < 3 {
 		return fmt.Errorf("inalid setUserBalance command parameters")
 	}
@@ -227,7 +254,7 @@ func (api *dndUtilBotApi) setUserBalance(upd *tgbotapi.Update) error {
 }
 
 func (api *dndUtilBotApi) getUserBalance(upd *tgbotapi.Update) error {
-	params := strings.Split(upd.Message.Text, " ")
+	params := api.getParams(upd.Message.Text)
 	if len(params) < 2 {
 		return fmt.Errorf("inalid GetUserBalance command parameters")
 	}
@@ -251,7 +278,7 @@ func (api *dndUtilBotApi) getUserBalance(upd *tgbotapi.Update) error {
 func (api *dndUtilBotApi) throwDice(upd *tgbotapi.Update) error {
 	msg := tgbotapi.NewMessage(
 		upd.Message.Chat.ID,
-		fmt.Sprintf(messageThrowDice, api.randomizer.Int()),
+		fmt.Sprintf(messageThrowDice, api.randomizer.Intn(20)+1),
 	)
 
 	api.replyWithMessage(upd, &msg)
@@ -274,7 +301,7 @@ func (api *dndUtilBotApi) getBalance(upd *tgbotapi.Update) error {
 }
 
 func (api *dndUtilBotApi) sendMoney(upd *tgbotapi.Update) error {
-	params := strings.Split(upd.Message.Text, " ")
+	params := api.getParams(upd.Message.Text)
 	if len(params) < 3 {
 		return fmt.Errorf("inalid MoveMoneyFromUserToUser command parameters")
 	}
@@ -305,5 +332,20 @@ func (api *dndUtilBotApi) notImplemented(upd *tgbotapi.Update) error {
 
 func (api *dndUtilBotApi) rightsViolation(upd *tgbotapi.Update) error {
 	api.replyWithRightsViolation(upd)
+	return nil
+}
+
+func (api *dndUtilBotApi) start(upd *tgbotapi.Update) error {
+	chat := upd.FromChat()
+	if chat.Type == ChatTypePrivate {
+		balance, err := api.storage.GetUserBalance(upd.SentFrom().ID)
+		if err != nil {
+			return err
+		}
+		msg := tgbotapi.NewMessage(chat.ID, fmt.Sprintf(messageStart, balance))
+		api.replyWithMessage(upd, &msg)
+	}
+
+	// pass for groups, because it is excessive
 	return nil
 }

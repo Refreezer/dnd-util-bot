@@ -3,22 +3,34 @@ package api
 import tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 const (
-	commandKeySendMoney               = "/sendMoney"
-	commandKeyGetBalance              = "/getBalance"
-	commandKeyThrowDice               = "/throwDice"
-	commandKeyGetUserBalance          = "/GetUserBalance"
-	commandKeySetUserBalance          = "/SetUserBalance"
-	commandKeyMoveMoneyFromUserToUser = "/MoveMoneyFromUserToUser"
+	commandKeyStart                   = "start"
+	commandKeySendMoney               = "sendMoney"
+	commandKeyGetBalance              = "getBalance"
+	commandKeyThrowDice               = "throwDice"
+	commandKeyGetUserBalance          = "getUserBalance"
+	commandKeySetUserBalance          = "setUserBalance"
+	commandKeyMoveMoneyFromUserToUser = "moveMoneyFromUserToUser"
 )
 
 var (
-	commandToNeedsAdminRightsMap = map[string]*command{
+	groupCommandsMap = map[string]*command{
+		commandKeyStart:                   {handlerStart, false},
 		commandKeySendMoney:               {handlerSendMoney, false},
 		commandKeyGetBalance:              {handlerGetBalance, false},
 		commandKeyThrowDice:               {handlerThrowDice, false},
 		commandKeyGetUserBalance:          {handlerGetUserBalance, true},
 		commandKeySetUserBalance:          {handlerSetUserBalance, true},
 		commandKeyMoveMoneyFromUserToUser: {handlerMoveMoneyFromUserToUser, true},
+	}
+
+	privateCommandsMap = map[string]*command{
+		commandKeyStart: {handlerStart, false},
+	}
+
+	chatTypeToCommandMap = map[string]map[string]*command{
+		ChatTypeGroup:      groupCommandsMap,
+		ChatTypeSuperGroup: groupCommandsMap,
+		ChatTypePrivate:    privateCommandsMap,
 	}
 
 	commandNotImplemented  = &command{handlerNotImplemented, false}
@@ -57,7 +69,12 @@ func newCommands(api *dndUtilBotApi) *commands {
 
 func (c *commands) resolve(upd *tgbotapi.Update) *command {
 	commandKey := upd.Message.Command()
-	cmd, ok := commandToNeedsAdminRightsMap[commandKey]
+	commandsMap, ok := chatTypeToCommandMap[upd.FromChat().Type]
+	if !ok {
+		return commandNotImplemented
+	}
+
+	cmd, ok := commandsMap[commandKey]
 	if !ok {
 		return commandNotImplemented
 	}
@@ -134,4 +151,8 @@ func handlerRightsViolation(api *dndUtilBotApi, upd *tgbotapi.Update) error {
 
 func handlerCantResolve(_ *dndUtilBotApi, _ *tgbotapi.Update) error {
 	return nil
+}
+
+func handlerStart(api *dndUtilBotApi, upd *tgbotapi.Update) error {
+	return api.start(upd)
 }

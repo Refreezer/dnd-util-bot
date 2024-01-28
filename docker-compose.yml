@@ -1,0 +1,8 @@
+version: '3.8'
+
+services:
+  bot:
+    image: refreezer/dnd-util-bot:v1
+    environment:
+      DndUtilTgApiKey: "6785497860:AAGVw253pQks8hOjxKOUCGOohrDuekXkh4M"
+      DndUtilLongPollingTimeout: 5

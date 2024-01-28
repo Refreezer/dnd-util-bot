@@ -44,12 +44,7 @@ func (m *MapStorage) MoveMoneyFromUserToUser(fromId int64, toId int64, amount ui
 func (m *MapStorage) SetUserBalance(userId int64, amount uint) error {
 	m.rwMutex.Lock()
 	defer m.rwMutex.Unlock()
-	balance, ok := m.userIdToBalance[userId]
-	if !ok {
-		return fmt.Errorf("no wallet for %d", userId)
-	}
-
-	m.userIdToBalance[userId] = amount + balance
+	m.userIdToBalance[userId] = amount
 	return nil
 }
 

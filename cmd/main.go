@@ -38,7 +38,7 @@ func main() {
 	}
 
 	loggerProvider := &loggerProvider{
-		Debug: *debug,
+		Debug: debug,
 	}
 	botListener := listener.NewBotListener(
 		tgBotApi,
@@ -86,17 +86,17 @@ func listenOsSignals(signalChannel chan os.Signal, cancel context.CancelFunc) {
 	}(signalChannel, cancel)
 }
 
-func validateConfiguration(debug *bool, timeout int) {
-	if !*debug && timeout == 0 {
+func validateConfiguration(debug bool, timeout int) {
+	if !debug && timeout == 0 {
 		Logger.Fatal("timeout can't be zero in production mode")
 	}
 }
 
-func parseFlags() *bool {
+func parseFlags() bool {
 	debug := flag.Bool("d", false, "Debug mode")
 	flag.Parse()
 	InitGlobalLogger(*debug)
-	return debug
+	return *debug
 }
 
 func parseEnvironmentVariables() (string, int) {
