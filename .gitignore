@@ -1,3 +1,4 @@
 .idea/
 /*.db
 /dndUtil.db.lock
+/Makefile
