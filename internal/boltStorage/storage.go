@@ -30,6 +30,17 @@ type BoltStorage struct {
 	logger *logging.Logger
 }
 
+func (b *BoltStorage) IsRegistered(userId int64) (bool, error) {
+	var ok bool
+	err := b.db.View(func(tx *bolt.Tx) error {
+		balance := tx.Bucket(userIdToBalanceBucketKey).Get(int64ToByteArr(userId))
+		ok = balance == nil
+		return nil
+	})
+
+	return ok, err
+}
+
 func NewBoltStorage(provider api.LoggerProvider) (storage *BoltStorage, close func()) {
 	logger := provider.MustGetLogger("boltStorage")
 	logger.Infof("Db path is %s", DBName)

@@ -9,4 +9,5 @@ var (
 	ErrorBalanceOverflow              = fmt.Errorf("balance has exceeded uint32")
 	ErrorInsufficientMoney            = fmt.Errorf("insufficient pounds")
 	ErrorNotRegistered                = fmt.Errorf("not registered error")
+	ErrorUsernameHidden               = fmt.Errorf("username is hidden, command is impossible to execute")
 )

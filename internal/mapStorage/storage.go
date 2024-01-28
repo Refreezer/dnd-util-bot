@@ -12,6 +12,13 @@ type MapStorage struct {
 	userIdToBalance  map[int64]uint
 }
 
+func (m *MapStorage) IsRegistered(userId int64) (bool, error) {
+	m.rwMutex.RLock()
+	defer m.rwMutex.RUnlock()
+	_, ok := m.userIdToBalance[userId]
+	return ok, nil
+}
+
 func NewMapStorage() *MapStorage {
 	return &MapStorage{
 		rwMutex:          new(sync.RWMutex),

@@ -64,6 +64,7 @@ type (
 		GetUserBalance(userId int64) (uint, error)
 		GetIdByUserName(userName string) (userId int64, ok bool)
 		SaveUserNameToUserIdMapping(name string, id int64) error
+		IsRegistered(userId int64) (bool, error)
 	}
 
 	LoggerProvider interface {
@@ -120,6 +121,14 @@ func (api *dndUtilBotApi) Handle(ctx context.Context, upd *tgbotapi.Update) {
 	}
 }
 
+func validateUsernameIsNotHidden(upd *tgbotapi.Update) error {
+	if upd.SentFrom().UserName == "" {
+		return ErrorUsernameHidden
+	}
+
+	return nil
+}
+
 func (api *dndUtilBotApi) handleMessage(upd *tgbotapi.Update) {
 	if upd.Message == nil || upd.Message.Chat == nil || upd.Message.From == nil {
 		return
@@ -138,7 +147,8 @@ func (api *dndUtilBotApi) handleMessage(upd *tgbotapi.Update) {
 }
 
 func (api *dndUtilBotApi) registerWallet(from *tgbotapi.User) {
-	if _, ok := api.storage.GetIdByUserName(from.UserName); ok {
+	_, mappingRegistered := api.getIdByUserNameSanitized(from.UserName)
+	if mappingRegistered {
 		return
 	}
 
@@ -151,10 +161,6 @@ func (api *dndUtilBotApi) registerWallet(from *tgbotapi.User) {
 	if err != nil {
 		api.logger.Errorf("couldn't set balance for %v", from)
 	}
-}
-
-func (api *dndUtilBotApi) replyWithErrorMessage(upd *tgbotapi.Update) {
-
 }
 
 func (api *dndUtilBotApi) executeCommand(upd *tgbotapi.Update) {
@@ -236,12 +242,7 @@ func (api *dndUtilBotApi) getMember(chatID int64, userID int64) (tgbotapi.ChatMe
 	return member, err
 }
 
-func (api *dndUtilBotApi) isUserRegistered(userName string) bool {
-	_, ok := api.getIdByUserNameSanitized(userName)
-	return ok
-}
-
-func (api *dndUtilBotApi) userIdByUserName(userName string, upd *tgbotapi.Update) (int64, bool) {
+func (api *dndUtilBotApi) userIdByUserName(userName string) (int64, bool) {
 	uid, ok := api.getIdByUserNameSanitized(userName)
 	return uid, ok
 }
@@ -264,7 +265,7 @@ func (api *dndUtilBotApi) moveMoneyFromUserToUser(upd *tgbotapi.Update) (*tgbota
 	}
 
 	userName := params[1]
-	fromId, ok := api.userIdByUserName(userName, upd)
+	fromId, ok := api.userIdByUserName(userName)
 	if !ok {
 		msg := tgbotapi.NewMessage(
 			upd.Message.Chat.ID,
@@ -275,7 +276,7 @@ func (api *dndUtilBotApi) moveMoneyFromUserToUser(upd *tgbotapi.Update) (*tgbota
 	}
 
 	to := params[2]
-	toId, ok := api.userIdByUserName(to, upd)
+	toId, ok := api.userIdByUserName(to)
 	if !ok {
 		msg := tgbotapi.NewMessage(
 			upd.Message.Chat.ID,
@@ -320,7 +321,7 @@ func (api *dndUtilBotApi) setUserBalance(upd *tgbotapi.Update) (*tgbotapi.Messag
 	}
 
 	userName := params[1]
-	userId, ok := api.userIdByUserName(userName, upd)
+	userId, ok := api.userIdByUserName(userName)
 	if !ok {
 		msg := tgbotapi.NewMessage(
 			upd.Message.Chat.ID,
@@ -346,7 +347,7 @@ func (api *dndUtilBotApi) getUserBalance(upd *tgbotapi.Update) (*tgbotapi.Messag
 	}
 
 	userName := params[1]
-	userId, ok := api.userIdByUserName(userName, upd)
+	userId, ok := api.userIdByUserName(userName)
 	if !ok {
 		msg := tgbotapi.NewMessage(
 			upd.Message.Chat.ID,
@@ -396,6 +397,11 @@ func (api *dndUtilBotApi) stickerThrowDice(upd *tgbotapi.Update) (*tgbotapi.Stic
 }
 
 func (api *dndUtilBotApi) getBalance(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
+	err := validateUsernameIsNotHidden(upd)
+	if err != nil {
+		return nil, err
+	}
+
 	balance, err := api.storage.GetUserBalance(upd.SentFrom().ID)
 	if err != nil {
 		return nil, fmt.Errorf("error during getBalance from storage %w", err)
@@ -414,6 +420,11 @@ func (api *dndUtilBotApi) messageGetUserBalanceSuccess(upd *tgbotapi.Update, bal
 }
 
 func (api *dndUtilBotApi) sendMoney(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
+	err := validateUsernameIsNotHidden(upd)
+	if err != nil {
+		return nil, err
+	}
+
 	params := api.getParams(upd.Message.Text)
 	if len(params) < 3 {
 		return nil, ErrorInvalidParameters
@@ -427,7 +438,7 @@ func (api *dndUtilBotApi) sendMoney(upd *tgbotapi.Update) (*tgbotapi.MessageConf
 	from := upd.SentFrom()
 	fromId := from.ID
 	to := params[1]
-	toId, ok := api.userIdByUserName(to, upd)
+	toId, ok := api.userIdByUserName(to)
 	if !ok {
 		msg := tgbotapi.NewMessage(
 			upd.Message.Chat.ID,
@@ -466,6 +477,11 @@ func (api *dndUtilBotApi) rightsViolation(upd *tgbotapi.Update) (*tgbotapi.Messa
 }
 
 func (api *dndUtilBotApi) start(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
+	err := validateUsernameIsNotHidden(upd)
+	if err != nil {
+		return nil, err
+	}
+
 	chat := upd.FromChat()
 	balance, err := api.storage.GetUserBalance(upd.SentFrom().ID)
 	if err != nil {
