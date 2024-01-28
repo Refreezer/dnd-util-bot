@@ -10,6 +10,7 @@ const (
 	commandGetBalanceLabel              = "Получить баланс"
 	commandSendMoneyPromptLabel         = "Послать денежку"
 	commandStartLabel                   = "Начать"
+	commandEmptyLabel                   = "-"
 
 	usageMoveMoneyFromUserToUser = "%s @sender @recipient 123"
 	usageSetUserBalance          = "%s @username 123"
@@ -19,19 +20,19 @@ const (
 
 var (
 	commandMoveMoneyFromUserToUser = &command{
-		handler:          handlerMoveMoneyFromUserToUser.setReplyMarkup(mainMenu),
+		handler:          handlerMoveMoneyFromUserToUser.setReplyToMessageID(),
 		needsAdminRights: true,
 		label:            commandMoveMoneyFromUserToUserLabel,
 		usage:            fmt.Sprintf(usageMoveMoneyFromUserToUser, addSlash(commandKeyMoveMoneyFromUserToUser)),
 	}
 	commandSetUserBalance = &command{
-		handler:          handlerSetUserBalance.setReplyMarkup(mainMenu),
+		handler:          handlerSetUserBalance.setReplyToMessageID(),
 		needsAdminRights: true,
 		label:            commandSetUserBalanceLabel,
 		usage:            fmt.Sprintf(usageSetUserBalance, addSlash(commandKeySetUserBalance)),
 	}
 	commandGetUserBalance = &command{
-		handler:          handlerGetUserBalance.setReplyMarkup(mainMenu),
+		handler:          handlerGetUserBalance.setReplyToMessageID(),
 		needsAdminRights: true,
 		label:            commandGetUserBalanceLabel,
 		usage:            fmt.Sprintf(usageGetUserBalance, addSlash(commandKeyGetUserBalance)),
@@ -52,6 +53,7 @@ var (
 	commandSendMoney = &command{
 		handler: handlerSendMoney.setReplyMarkup(mainMenu).setReplyToMessageID(),
 		usage:   fmt.Sprintf(usageSendMoney, addSlash(commandKeySendMoney)),
+		label:   commandEmptyLabel,
 	}
 	commandStart = &command{
 		handler: handlerStart.setReplyMarkup(mainMenu),
@@ -59,9 +61,11 @@ var (
 	}
 	commandNotImplemented = &command{
 		handler: handlerNotImplemented.setReplyMarkup(mainMenu),
+		label:   commandEmptyLabel,
 	}
 	commandRightsViolation = &command{
 		handler: handlerRightsViolation.setReplyMarkup(mainMenu),
+		label:   commandEmptyLabel,
 	}
 	commandCanNotResolve = &command{
 		handler: handlerCantResolve.setReplyMarkup(mainMenu),

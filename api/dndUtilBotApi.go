@@ -164,14 +164,18 @@ func (api *dndUtilBotApi) executeCommand(upd *tgbotapi.Update) {
 		return
 	}
 
-	var msg tgbotapi.MessageConfig
+	var msg *tgbotapi.MessageConfig
 	chatID := upd.FromChat().ID
 	if errors.Is(err, ErrorInvalidParameters) {
-		msg = tgbotapi.NewMessage(chatID, fmt.Sprintf(errorMessageInvalidParametersFormat, cmd.usage))
+		msg = api.plainMessage(chatID, fmt.Sprintf(errorMessageInvalidParametersFormat, cmd.usage))
 	} else if errors.Is(err, ErrorInvalidIntegerParameter) {
-		msg = tgbotapi.NewMessage(chatID, errorMessageInvalidIntegerParameter)
+		msg = api.plainMessage(chatID, errorMessageInvalidIntegerParameter)
 	} else if errors.Is(err, ErrorInvalidTransactionParameters) {
-		msg = tgbotapi.NewMessage(chatID, errorMessageInvalidTransactionParameters)
+		msg = api.plainMessage(chatID, errorMessageInvalidTransactionParameters)
+	}
+
+	if msg == nil {
+		return
 	}
 
 	msg.ParseMode = tgbotapi.ModeMarkdownV2

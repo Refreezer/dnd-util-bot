@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	DBName = "dndUtil.db"
+	DBName = "data/dndUtil.db"
 )
 
 var (
