@@ -1,6 +1,11 @@
+---
+meta:
+  environment: docker
+  toolchain:
+    name: docker
+    version: latest
 build:
-  skip: yes
-
+  skip: true
 run:
   image: hub.docker.com/repository/docker/refreezer/dnd-util-bot:latest
   persistenceMount: /data
