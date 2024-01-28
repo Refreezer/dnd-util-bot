@@ -2,3 +2,5 @@
 /*.db
 /dndUtil.db.lock
 /Makefile
+/data/*.db
+/data/*.lock
