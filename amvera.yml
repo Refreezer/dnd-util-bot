@@ -10,5 +10,5 @@ build:
 run:
   persistenceMount: /data
   containerPort: 80
-  command: go mod download & go build -C cmd -o ../dnd-util-bot & chmod +x dnd-util-bot
+  command: go mod download & go build -C cmd -o ../dnd-util-bot && ./dnd-util-bot
   image: dnd-util-bot
