@@ -1,46 +1,61 @@
 package api
 
+import "fmt"
+
 const (
 	commandMoveMoneyFromUserToUserLabel = "(Админ) Перевод между игроками"
 	commandSetUserBalanceLabel          = "(Админ) Задать баланс игрока"
 	commandGetUserBalanceLabel          = "(Админ) Получить баланс юзера"
 	commandThrowDiceLabel               = "Кинуть кубик"
 	commandGetBalanceLabel              = "Получить баланс"
-	commandSendMoneyLabel               = "Послать денежку"
+	commandSendMoneyPromptLabel         = "Послать денежку"
 	commandStartLabel                   = "Начать"
+
+	usageMoveMoneyFromUserToUser = "%s @sender @recipient amount"
+	usageSetUserBalance          = "%s @username amount"
+	usageGetUserBalance          = "%s @username"
+	usageSendMoney               = "%s @username amount"
 )
 
 var (
 	commandMoveMoneyFromUserToUser = &command{
 		handler:          handlerMoveMoneyFromUserToUser.setReplyMarkup(mainMenu),
 		needsAdminRights: true,
-		label:            "(Админ) Перевод между игроками",
+		label:            commandMoveMoneyFromUserToUserLabel,
+		usage:            fmt.Sprintf(usageMoveMoneyFromUserToUser, addSlash(commandKeyMoveMoneyFromUserToUser)),
 	}
 	commandSetUserBalance = &command{
 		handler:          handlerSetUserBalance.setReplyMarkup(mainMenu),
 		needsAdminRights: true,
-		label:            "(Админ) Задать баланс игрока",
+		label:            commandSetUserBalanceLabel,
+		usage:            fmt.Sprintf(usageSetUserBalance, addSlash(commandKeySetUserBalance)),
 	}
 	commandGetUserBalance = &command{
 		handler:          handlerGetUserBalance.setReplyMarkup(mainMenu),
 		needsAdminRights: true,
-		label:            "(Админ) Получить баланс юзера",
+		label:            commandGetUserBalanceLabel,
+		usage:            fmt.Sprintf(usageGetUserBalance, addSlash(commandKeyGetUserBalance)),
 	}
 	commandThrowDice = &command{
 		handler: handlerThrowDice.setReplyMarkup(mainMenu).setReplyToMessageID(),
-		label:   "Кинуть кубик",
+		label:   commandThrowDiceLabel,
 	}
 	commandGetBalance = &command{
 		handler: handlerGetBalance.setReplyMarkup(mainMenu),
-		label:   "Получить баланс",
+		label:   commandGetBalanceLabel,
 	}
+	commandSendMoneyPrompt = &command{
+		handler: handlerSendMoneyPrompt.setReplyMarkup(mainMenu).setReplyToMessageID(),
+		label:   commandSendMoneyPromptLabel,
+	}
+
 	commandSendMoney = &command{
 		handler: handlerSendMoney.setReplyMarkup(mainMenu).setReplyToMessageID(),
-		label:   "Послать денежку",
+		usage:   fmt.Sprintf(usageSendMoney, addSlash(commandKeySendMoney)),
 	}
 	commandStart = &command{
 		handler: handlerStart.setReplyMarkup(mainMenu),
-		label:   "Начать",
+		label:   commandStartLabel,
 	}
 	commandNotImplemented = &command{
 		handler: handlerNotImplemented.setReplyMarkup(mainMenu),
@@ -52,3 +67,7 @@ var (
 		handler: handlerCantResolve.setReplyMarkup(mainMenu),
 	}
 )
+
+func addSlash(s string) string {
+	return fmt.Sprintf("/%s", s)
+}

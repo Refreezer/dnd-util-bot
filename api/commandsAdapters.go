@@ -62,6 +62,10 @@ var (
 		return api.getBalance(upd)
 	}
 
+	handlerSendMoneyPrompt commandHandler = func(api *dndUtilBotApi, upd *tgbotapi.Update) (tgbotapi.Chattable, error) {
+		return api.sendMoneyPrompt(upd)
+	}
+
 	handlerSendMoney commandHandler = func(api *dndUtilBotApi, upd *tgbotapi.Update) (tgbotapi.Chattable, error) {
 		return api.sendMoney(upd)
 	}

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/Refreezer/dnd-util-bot/api/listener"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -20,30 +21,33 @@ const (
 	ChatChannel                   = "channel"
 	ChatMemberCreator             = "creator"
 	ChatMemberStatusAdministrator = "administrator"
+	D20StickerSetname             = "D20STUMP"
 )
 
-var d20NumToEmojiMap = map[int]string{
-	1:  "1️⃣",
-	2:  "2️⃣",
-	3:  "3️⃣",
-	4:  "4️⃣",
-	5:  "5️⃣",
-	6:  "6️⃣",
-	7:  "7️⃣",
-	8:  "8️⃣",
-	9:  "9️⃣",
-	10: "🔟",
-	11: "🆙",
-	12: "🆗",
-	13: "🔡",
-	14: "🔢",
-	15: "🔤",
-	16: "🅰️",
-	17: "🆎",
-	18: "🅱️",
-	19: "🆑",
-	20: "🆒",
-}
+var (
+	d20NumToEmojiMap = map[int]string{
+		1:  "1️⃣",
+		2:  "2️⃣",
+		3:  "3️⃣",
+		4:  "4️⃣",
+		5:  "5️⃣",
+		6:  "6️⃣",
+		7:  "7️⃣",
+		8:  "8️⃣",
+		9:  "9️⃣",
+		10: "🔟",
+		11: "🆙",
+		12: "🆗",
+		13: "🔡",
+		14: "🔢",
+		15: "🔤",
+		16: "🅰️",
+		17: "🆎",
+		18: "🅱️",
+		19: "🆑",
+		20: "🆒",
+	}
+)
 
 type (
 	DndUtilApi interface {
@@ -149,11 +153,37 @@ func (api *dndUtilBotApi) registerWallet(from *tgbotapi.User) {
 	}
 }
 
+func (api *dndUtilBotApi) replyWithErrorMessage(upd *tgbotapi.Update) {
+
+}
+
 func (api *dndUtilBotApi) executeCommand(upd *tgbotapi.Update) {
-	err := api.commands.resolve(upd).build(api).execute(upd)
-	if err != nil {
-		api.logger.Errorf("couldn't execute command %s", err)
+	cmd := api.commands.resolve(upd)
+	err := cmd.build(api).execute(upd)
+	if err == nil {
+		return
 	}
+
+	var msg tgbotapi.MessageConfig
+	chatID := upd.FromChat().ID
+	if errors.Is(err, ErrorInvalidParameters) {
+		msg = tgbotapi.NewMessage(chatID, fmt.Sprintf(errorMessageInvalidParametersFormat, cmd.usage))
+	} else if errors.Is(err, ErrorInvalidIntegerParameter) {
+		msg = tgbotapi.NewMessage(chatID, errorMessageInvalidIntegerParameter)
+	} else if errors.Is(err, ErrorInvalidTransactionParameters) {
+		msg = tgbotapi.NewMessage(chatID, errorMessageInvalidTransactionParameters)
+	}
+
+	msg.ParseMode = tgbotapi.ModeMarkdownV2
+	_, err = api.tgBotApi.Send(msg)
+	if err != nil {
+		api.logger.Errorf("couldn't send reply error message %s", err)
+	}
+}
+
+func (api *dndUtilBotApi) plainMessage(chatId int64, text string) *tgbotapi.MessageConfig {
+	msg := tgbotapi.NewMessage(chatId, text)
+	return &msg
 }
 
 func (api *dndUtilBotApi) messageRightsViolation(upd *tgbotapi.Update) *tgbotapi.MessageConfig {
@@ -217,12 +247,12 @@ func (api *dndUtilBotApi) getIdByUserNameSanitized(userName string) (int64, bool
 func (api *dndUtilBotApi) moveMoneyFromUserToUser(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
 	params := api.getParams(upd.Message.Text)
 	if len(params) < 4 {
-		return nil, fmt.Errorf("inalid MoveMoneyFromUserToUser command parameters")
+		return nil, ErrorInvalidParameters
 	}
 
 	amount, err := strconv.Atoi(params[3])
-	if err != nil {
-		return nil, fmt.Errorf("can't convert money amount toId integer %w", err)
+	if err != nil || amount == 0 {
+		return nil, ErrorInvalidIntegerParameter
 	}
 
 	userName := params[1]
@@ -248,7 +278,7 @@ func (api *dndUtilBotApi) moveMoneyFromUserToUser(upd *tgbotapi.Update) (*tgbota
 	}
 
 	if fromId == toId {
-		return nil, fmt.Errorf("can't make transaction from sender acc to itself")
+		return nil, ErrorInvalidTransactionParameters
 	}
 
 	err = api.storage.MoveMoneyFromUserToUser(fromId, toId, uint(amount))
@@ -273,12 +303,12 @@ func (api *dndUtilBotApi) getParams(text string) []string {
 func (api *dndUtilBotApi) setUserBalance(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
 	params := api.getParams(upd.Message.Text)
 	if len(params) < 3 {
-		return nil, fmt.Errorf("inalid setUserBalance command parameters")
+		return nil, ErrorInvalidParameters
 	}
 
 	amount, err := strconv.Atoi(params[2])
 	if err != nil {
-		return nil, fmt.Errorf("can't convert money amount to integer %w", err)
+		return nil, ErrorInvalidIntegerParameter
 	}
 
 	userName := params[1]
@@ -304,7 +334,7 @@ func (api *dndUtilBotApi) setUserBalance(upd *tgbotapi.Update) (*tgbotapi.Messag
 func (api *dndUtilBotApi) getUserBalance(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
 	params := api.getParams(upd.Message.Text)
 	if len(params) < 2 {
-		return nil, fmt.Errorf("inalid GetUserBalance command parameters")
+		return nil, ErrorInvalidParameters
 	}
 
 	userName := params[1]
@@ -339,7 +369,7 @@ func (api *dndUtilBotApi) stickerThrowDice(upd *tgbotapi.Update) (*tgbotapi.Stic
 	}
 
 	set, err := api.tgBotApi.GetStickerSet(tgbotapi.GetStickerSetConfig{
-		Name: "D20STUMP",
+		Name: D20StickerSetname,
 	})
 	if err != nil {
 		return nil, err
@@ -378,12 +408,12 @@ func (api *dndUtilBotApi) messageGetUserBalanceSuccess(upd *tgbotapi.Update, bal
 func (api *dndUtilBotApi) sendMoney(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
 	params := api.getParams(upd.Message.Text)
 	if len(params) < 3 {
-		return nil, fmt.Errorf("inalid MoveMoneyFromUserToUser command parameters")
+		return nil, ErrorInvalidParameters
 	}
 
 	amount, err := strconv.Atoi(params[2])
 	if err != nil {
-		return nil, fmt.Errorf("can't convert money amount toId integer %w", err)
+		return nil, ErrorInvalidIntegerParameter
 	}
 
 	from := upd.SentFrom()
@@ -397,6 +427,10 @@ func (api *dndUtilBotApi) sendMoney(upd *tgbotapi.Update) (*tgbotapi.MessageConf
 		)
 
 		return &msg, nil
+	}
+
+	if fromId == toId {
+		return nil, ErrorInvalidTransactionParameters
 	}
 
 	err = api.storage.MoveMoneyFromUserToUser(fromId, toId, uint(amount))
@@ -431,5 +465,11 @@ func (api *dndUtilBotApi) start(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, 
 	}
 
 	msg := tgbotapi.NewMessage(chat.ID, fmt.Sprintf(messageStart, balance))
+	return &msg, nil
+}
+
+func (api *dndUtilBotApi) sendMoneyPrompt(upd *tgbotapi.Update) (tgbotapi.Chattable, error) {
+	msg := tgbotapi.NewMessage(upd.FromChat().ID, messageSendMoneyPrompt)
+	msg.ParseMode = tgbotapi.ModeMarkdownV2
 	return &msg, nil
 }

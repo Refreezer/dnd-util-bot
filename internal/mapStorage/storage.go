@@ -2,6 +2,7 @@ package mapStorage
 
 import (
 	"fmt"
+	"github.com/Refreezer/dnd-util-bot/internal"
 	"sync"
 )
 
@@ -28,7 +29,7 @@ func (m *MapStorage) MoveMoneyFromUserToUser(fromId int64, toId int64, amount ui
 	}
 
 	if fromBalance < amount {
-		return fmt.Errorf("insufficient pounds in sender %d wallet", fromId)
+		return internal.ErrorInsufficientMoney
 	}
 
 	toBalance, ok := m.userIdToBalance[toId]
