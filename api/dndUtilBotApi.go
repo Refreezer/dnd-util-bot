@@ -311,8 +311,10 @@ func (api *dndUtilBotApi) sendMoney(upd *tgbotapi.Update) error {
 		return fmt.Errorf("can't convert money amount toId integer %w", err)
 	}
 
-	fromId := upd.SentFrom().ID
-	toId, ok := api.userIdByUserNameAndReplyIfCant(params[1], upd)
+	from := upd.SentFrom()
+	fromId := from.ID
+	to := params[1]
+	toId, ok := api.userIdByUserNameAndReplyIfCant(to, upd)
 	if !ok {
 		return nil
 	}
@@ -322,6 +324,11 @@ func (api *dndUtilBotApi) sendMoney(upd *tgbotapi.Update) error {
 		return fmt.Errorf("error during MoveMoneyFromUserToUser %w", err)
 	}
 
+	msg := tgbotapi.NewMessage(
+		upd.FromChat().ID,
+		fmt.Sprintf(messageSendMoney, amount, fmt.Sprintf("@%s", from), to),
+	)
+	api.replyWithMessage(upd, &msg)
 	return nil
 }
 
@@ -337,15 +344,12 @@ func (api *dndUtilBotApi) rightsViolation(upd *tgbotapi.Update) error {
 
 func (api *dndUtilBotApi) start(upd *tgbotapi.Update) error {
 	chat := upd.FromChat()
-	if chat.Type == ChatTypePrivate {
-		balance, err := api.storage.GetUserBalance(upd.SentFrom().ID)
-		if err != nil {
-			return err
-		}
-		msg := tgbotapi.NewMessage(chat.ID, fmt.Sprintf(messageStart, balance))
-		api.replyWithMessage(upd, &msg)
+	balance, err := api.storage.GetUserBalance(upd.SentFrom().ID)
+	if err != nil {
+		return err
 	}
 
-	// pass for groups, because it is excessive
+	msg := tgbotapi.NewMessage(chat.ID, fmt.Sprintf(messageStart, balance))
+	api.replyWithMessage(upd, &msg)
 	return nil
 }
