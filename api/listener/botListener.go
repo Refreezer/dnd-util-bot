@@ -118,7 +118,14 @@ func (l *dndUtilBotListener) worker(ctx context.Context, tasks <-chan *tgbotapi.
 				return
 			}
 
-			l.conf.UpdateHandler.Handle(ctx, update)
+			func() {
+				defer func() {
+					recover()
+					l.logger.Warning("recovered after update handler failed")
+				}()
+
+				l.conf.UpdateHandler.Handle(ctx, update)
+			}()
 			continue
 		}
 	}
