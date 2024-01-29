@@ -15,7 +15,7 @@ type (
 	}
 
 	UpdateHandler interface {
-		Handle(ctx context.Context, upd *tgbotapi.Update)
+		HandleUpdate(ctx context.Context, upd *tgbotapi.Update)
 	}
 
 	Config struct {
@@ -125,7 +125,7 @@ func (l *dndUtilBotListener) worker(ctx context.Context, tasks <-chan *tgbotapi.
 					}
 				}()
 
-				l.conf.UpdateHandler.Handle(ctx, update)
+				l.conf.UpdateHandler.HandleUpdate(ctx, update)
 			}()
 			continue
 		}

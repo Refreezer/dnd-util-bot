@@ -4,3 +4,4 @@
 /Makefile
 /data/*.db
 /data/*.lock
+/setEnv.bat

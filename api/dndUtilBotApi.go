@@ -59,12 +59,12 @@ type (
 	}
 
 	Storage interface {
-		MoveMoneyFromUserToUser(fromId int64, toId int64, amount uint) error
-		SetUserBalance(userId int64, amount uint) error
-		GetUserBalance(userId int64) (uint, error)
+		MoveMoneyFromUserToUser(chatId int64, fromId int64, toId int64, amount uint) error
+		SetUserBalance(chatId int64, userId int64, amount uint) error
+		GetUserBalance(chatId int64, userId int64) (uint, error)
 		GetIdByUserName(userName string) (userId int64, ok bool)
 		SaveUserNameToUserIdMapping(name string, id int64) error
-		IsRegistered(userId int64) (bool, error)
+		IsRegistered(chatId int64, userId int64) (bool, error)
 	}
 
 	LoggerProvider interface {
@@ -116,9 +116,9 @@ func newDndUtilApi(
 	return api
 }
 
-func (api *dndUtilBotApi) Handle(ctx context.Context, upd *tgbotapi.Update) {
+func (api *dndUtilBotApi) HandleUpdate(ctx context.Context, upd *tgbotapi.Update) {
 	if upd.Message != nil {
-		api.handleMessage(upd)
+		api.handleUpdate(upd)
 	}
 }
 
@@ -130,13 +130,13 @@ func validateUsernameIsNotHidden(upd *tgbotapi.Update) error {
 	return nil
 }
 
-func (api *dndUtilBotApi) handleMessage(upd *tgbotapi.Update) {
+func (api *dndUtilBotApi) handleUpdate(upd *tgbotapi.Update) {
 	if upd.Message == nil || upd.Message.Chat == nil || upd.Message.From == nil {
 		return
 	}
 
 	from := upd.SentFrom()
-	api.registerWallet(from)
+	api.registerWalletIfNeeded(upd.FromChat().ID, from)
 	switch upd.Message.Chat.Type {
 	case ChatTypeGroup, ChatTypeSuperGroup, ChatTypePrivate:
 		api.executeCommand(upd)
@@ -147,18 +147,25 @@ func (api *dndUtilBotApi) handleMessage(upd *tgbotapi.Update) {
 	}
 }
 
-func (api *dndUtilBotApi) registerWallet(from *tgbotapi.User) {
+func (api *dndUtilBotApi) registerWalletIfNeeded(chatId int64, from *tgbotapi.User) {
 	_, mappingRegistered := api.getIdByUserNameSanitized(from.UserName)
-	if mappingRegistered {
+	if !mappingRegistered {
+		err := api.storage.SaveUserNameToUserIdMapping(from.UserName, from.ID)
+		if err != nil {
+			api.logger.Errorf("couldn't save user id mapping for %v", from)
+		}
+	}
+
+	isRegistered, err := api.storage.IsRegistered(chatId, from.ID)
+	if err != nil {
+		api.logger.Errorf("couldn't know if user is registered for chatID=%d username=%s", chatId, from.UserName)
+	}
+
+	if isRegistered {
 		return
 	}
 
-	err := api.storage.SaveUserNameToUserIdMapping(from.UserName, from.ID)
-	if err != nil {
-		api.logger.Errorf("couldn't save user id mapping for %v", from)
-	}
-
-	err = api.storage.SetUserBalance(from.ID, 0)
+	err = api.storage.SetUserBalance(chatId, from.ID, 0)
 	if err != nil {
 		api.logger.Errorf("couldn't set balance for %v", from)
 	}
@@ -294,7 +301,7 @@ func (api *dndUtilBotApi) moveMoneyFromUserToUser(upd *tgbotapi.Update) (*tgbota
 		return nil, ErrorInvalidTransactionParameters
 	}
 
-	err = api.storage.MoveMoneyFromUserToUser(fromId, toId, uint(amount))
+	err = api.storage.MoveMoneyFromUserToUser(upd.FromChat().ID, fromId, toId, uint(amount))
 	if err != nil {
 		return nil, fmt.Errorf("error during MoveMoneyFromUserToUser %w", err)
 	}
@@ -335,7 +342,7 @@ func (api *dndUtilBotApi) setUserBalance(upd *tgbotapi.Update) (*tgbotapi.Messag
 		return &msg, nil
 	}
 
-	err = api.storage.SetUserBalance(userId, uint(amount))
+	err = api.storage.SetUserBalance(upd.FromChat().ID, userId, uint(amount))
 	if err != nil {
 		return nil, fmt.Errorf("error during setUserBalance %w", err)
 	}
@@ -361,7 +368,7 @@ func (api *dndUtilBotApi) getUserBalance(upd *tgbotapi.Update) (*tgbotapi.Messag
 		return &msg, nil
 	}
 
-	balance, err := api.storage.GetUserBalance(userId)
+	balance, err := api.storage.GetUserBalance(upd.FromChat().ID, userId)
 	if err != nil {
 		return nil, fmt.Errorf("error during getting balance from storage %w", err)
 	}
@@ -406,7 +413,7 @@ func (api *dndUtilBotApi) getBalance(upd *tgbotapi.Update) (*tgbotapi.MessageCon
 		return nil, err
 	}
 
-	balance, err := api.storage.GetUserBalance(upd.SentFrom().ID)
+	balance, err := api.storage.GetUserBalance(upd.FromChat().ID, upd.SentFrom().ID)
 	if err != nil {
 		return nil, fmt.Errorf("error during getBalance from storage %w", err)
 	}
@@ -456,7 +463,7 @@ func (api *dndUtilBotApi) sendMoney(upd *tgbotapi.Update) (*tgbotapi.MessageConf
 		return nil, ErrorInvalidTransactionParameters
 	}
 
-	err = api.storage.MoveMoneyFromUserToUser(fromId, toId, uint(amount))
+	err = api.storage.MoveMoneyFromUserToUser(upd.FromChat().ID, fromId, toId, uint(amount))
 	if err != nil {
 		return nil, fmt.Errorf("error during MoveMoneyFromUserToUser %w", err)
 	}
@@ -487,7 +494,7 @@ func (api *dndUtilBotApi) start(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, 
 	}
 
 	chat := upd.FromChat()
-	balance, err := api.storage.GetUserBalance(upd.SentFrom().ID)
+	balance, err := api.storage.GetUserBalance(upd.SentFrom().ID, upd.SentFrom().ID)
 	if err != nil {
 		return nil, err
 	}

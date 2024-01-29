@@ -30,11 +30,11 @@ type BoltStorage struct {
 	logger *logging.Logger
 }
 
-func (b *BoltStorage) IsRegistered(userId int64) (bool, error) {
+func (b *BoltStorage) IsRegistered(chatId int64, userId int64) (bool, error) {
 	var ok bool
 	err := b.db.View(func(tx *bolt.Tx) error {
-		balance := tx.Bucket(userIdToBalanceBucketKey).Get(int64ToByteArr(userId))
-		ok = balance == nil
+		balance := tx.Bucket(userIdToBalanceBucketKey).Get(balanceBucketKey(chatId, userId))
+		ok = balance != nil
 		return nil
 	})
 
@@ -91,6 +91,12 @@ func initBucket(tx *bolt.Tx, bucketKey []byte) error {
 	return err
 }
 
+func balanceBucketKey(chatId, userId int64) []byte {
+	bytes := make([]byte, 0)
+	bytes = binary.LittleEndian.AppendUint64(bytes, uint64(chatId))
+	return binary.LittleEndian.AppendUint64(bytes, uint64(userId))
+}
+
 func int64ToByteArr(value int64) []byte {
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, uint64(value))
@@ -111,21 +117,21 @@ func int64FromByteArr(arr []byte) int64 {
 	return int64(binary.LittleEndian.Uint64(arr))
 }
 
-func (b *BoltStorage) MoveMoneyFromUserToUser(fromId int64, toId int64, amount uint) error {
+func (b *BoltStorage) MoveMoneyFromUserToUser(chatId int64, fromId int64, toId int64, amount uint) error {
 	if toId == fromId {
 		return api.ErrorInvalidTransactionParameters
 	}
 
 	err := b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(userIdToBalanceBucketKey)
-		fromIdKey := int64ToByteArr(fromId)
-		fromBalanceBytes := bucket.Get(fromIdKey)
+		fromKey := balanceBucketKey(chatId, fromId)
+		fromBalanceBytes := bucket.Get(fromKey)
 		if fromBalanceBytes == nil {
 			return api.ErrorNotRegistered
 		}
 
-		toIdKey := int64ToByteArr(toId)
-		toBalanceBytes := bucket.Get(toIdKey)
+		toKey := balanceBucketKey(chatId, fromId)
+		toBalanceBytes := bucket.Get(toKey)
 		if toBalanceBytes == nil {
 			return api.ErrorNotRegistered
 		}
@@ -137,7 +143,7 @@ func (b *BoltStorage) MoveMoneyFromUserToUser(fromId int64, toId int64, amount u
 		}
 
 		newFromBalanceBytes := uintToByteArr(fromBalance - amount)
-		err := bucket.Put(fromIdKey, newFromBalanceBytes)
+		err := bucket.Put(fromKey, newFromBalanceBytes)
 		if err != nil {
 			return err
 		}
@@ -146,7 +152,7 @@ func (b *BoltStorage) MoveMoneyFromUserToUser(fromId int64, toId int64, amount u
 			return api.ErrorBalanceOverflow
 		}
 
-		err = bucket.Put(toIdKey, uintToByteArr(amount+toBalance))
+		err = bucket.Put(toKey, uintToByteArr(amount+toBalance))
 		if err != nil {
 			return err
 		}
@@ -161,7 +167,7 @@ func (b *BoltStorage) MoveMoneyFromUserToUser(fromId int64, toId int64, amount u
 	return err
 }
 
-func (b *BoltStorage) SetUserBalance(userId int64, amount uint) error {
+func (b *BoltStorage) SetUserBalance(chatId int64, userId int64, amount uint) error {
 	if amount < 0 {
 		return api.ErrorInsufficientMoney
 	}
@@ -172,17 +178,17 @@ func (b *BoltStorage) SetUserBalance(userId int64, amount uint) error {
 
 	return b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(userIdToBalanceBucketKey)
-		userIdKey := int64ToByteArr(userId)
+		userIdKey := balanceBucketKey(chatId, userId)
 		return bucket.Put(userIdKey, uintToByteArr(amount))
 	})
 }
 
-func (b *BoltStorage) GetUserBalance(userId int64) (uint, error) {
+func (b *BoltStorage) GetUserBalance(chatId int64, userId int64) (uint, error) {
 	var balance uint
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(userIdToBalanceBucketKey)
-		userIdKey := int64ToByteArr(userId)
-		balanceBytes := bucket.Get(userIdKey)
+		userKey := balanceBucketKey(chatId, userId)
+		balanceBytes := bucket.Get(userKey)
 		if balanceBytes == nil {
 			return api.ErrorNotRegistered
 		}

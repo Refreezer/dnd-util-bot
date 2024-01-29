@@ -6,31 +6,37 @@ import (
 	"sync"
 )
 
-type MapStorage struct {
-	rwMutex          *sync.RWMutex
-	userNameToUserId map[string]int64
-	userIdToBalance  map[int64]uint
+type balanceBucketKey struct {
+	chatId int64
+	userId int64
 }
 
-func (m *MapStorage) IsRegistered(userId int64) (bool, error) {
+type MapStorage struct {
+	rwMutex               *sync.RWMutex
+	userNameToUserId      map[string]int64
+	chatIdUserIdToBalance map[balanceBucketKey]uint
+}
+
+func (m *MapStorage) IsRegistered(chatId int64, userId int64) (bool, error) {
 	m.rwMutex.RLock()
 	defer m.rwMutex.RUnlock()
-	_, ok := m.userIdToBalance[userId]
+	_, ok := m.chatIdUserIdToBalance[balanceBucketKey{chatId, userId}]
 	return ok, nil
 }
 
 func NewMapStorage() *MapStorage {
 	return &MapStorage{
-		rwMutex:          new(sync.RWMutex),
-		userNameToUserId: make(map[string]int64),
-		userIdToBalance:  make(map[int64]uint),
+		rwMutex:               new(sync.RWMutex),
+		userNameToUserId:      make(map[string]int64),
+		chatIdUserIdToBalance: make(map[balanceBucketKey]uint),
 	}
 }
 
-func (m *MapStorage) MoveMoneyFromUserToUser(fromId int64, toId int64, amount uint) error {
+func (m *MapStorage) MoveMoneyFromUserToUser(chatId int64, fromId int64, toId int64, amount uint) error {
 	m.rwMutex.Lock()
 	defer m.rwMutex.Unlock()
-	fromBalance, ok := m.userIdToBalance[fromId]
+	fromKey := balanceBucketKey{chatId, fromId}
+	fromBalance, ok := m.chatIdUserIdToBalance[fromKey]
 	if !ok {
 		return api.ErrorNotRegistered
 	}
@@ -39,27 +45,28 @@ func (m *MapStorage) MoveMoneyFromUserToUser(fromId int64, toId int64, amount ui
 		return api.ErrorInsufficientMoney
 	}
 
-	toBalance, ok := m.userIdToBalance[toId]
+	toKey := balanceBucketKey{chatId, toId}
+	toBalance, ok := m.chatIdUserIdToBalance[toKey]
 	if !ok {
 		return api.ErrorNotRegistered
 	}
 
-	m.userIdToBalance[fromId] = fromBalance - amount
-	m.userIdToBalance[toId] = amount + toBalance
+	m.chatIdUserIdToBalance[fromKey] = fromBalance - amount
+	m.chatIdUserIdToBalance[toKey] = amount + toBalance
 	return nil
 }
 
-func (m *MapStorage) SetUserBalance(userId int64, amount uint) error {
+func (m *MapStorage) SetUserBalance(chatId int64, userId int64, amount uint) error {
 	m.rwMutex.Lock()
 	defer m.rwMutex.Unlock()
-	m.userIdToBalance[userId] = amount
+	m.chatIdUserIdToBalance[balanceBucketKey{chatId, userId}] = amount
 	return nil
 }
 
-func (m *MapStorage) GetUserBalance(userId int64) (uint, error) {
+func (m *MapStorage) GetUserBalance(chatId int64, userId int64) (uint, error) {
 	m.rwMutex.RLock()
 	defer m.rwMutex.RUnlock()
-	balance, ok := m.userIdToBalance[userId]
+	balance, ok := m.chatIdUserIdToBalance[balanceBucketKey{chatId, userId}]
 	if !ok {
 		return 0, fmt.Errorf("no wallet for %d", userId)
 	}
