@@ -149,7 +149,7 @@ func (api *dndUtilBotApi) handleUpdate(upd *tgbotapi.Update) {
 
 func (api *dndUtilBotApi) registerWalletIfNeeded(chatId int64, from *tgbotapi.User) {
 	_, mappingRegistered := api.getIdByUserNameSanitized(from.UserName)
-	api.logger.Infof("registerWalletIfNeeded : mappingRegistered=%v", mappingRegistered)
+	api.logger.Debugf("registerWalletIfNeeded : mappingRegistered=%v", mappingRegistered)
 	if !mappingRegistered {
 		err := api.storage.SaveUserNameToUserIdMapping(from.UserName, from.ID)
 		if err != nil {
@@ -158,7 +158,7 @@ func (api *dndUtilBotApi) registerWalletIfNeeded(chatId int64, from *tgbotapi.Us
 	}
 
 	isRegistered, err := api.storage.IsRegistered(chatId, from.ID)
-	api.logger.Infof("registerWalletIfNeeded : isRegistered=%v, err=%s", isRegistered, err)
+	api.logger.Debugf("registerWalletIfNeeded : isRegistered=%v, err=%s", isRegistered, err)
 	if err != nil {
 		api.logger.Errorf("couldn't know if user is registered for chatID=%d username=%s", chatId, from.UserName)
 	}
