@@ -6,9 +6,9 @@ const (
 	commandMoveMoneyFromUserToUserLabel = "(Админ) Перевод между игроками"
 	commandSetUserBalanceLabel          = "(Админ) Задать баланс игрока"
 	commandGetUserBalanceLabel          = "(Админ) Получить баланс юзера"
-	commandThrowDiceLabel               = "Кинуть кубик"
-	commandGetBalanceLabel              = "Получить баланс"
-	commandSendMoneyPromptLabel         = "Послать денежку"
+	commandThrowDiceLabel               = "Бросок d20"
+	commandGetBalanceLabel              = "Мой кошель"
+	commandSendMoneyPromptLabel         = "Передать монеты"
 	commandStartLabel                   = "Начать"
 	commandEmptyLabel                   = "-"
 
