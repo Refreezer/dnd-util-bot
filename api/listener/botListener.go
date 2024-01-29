@@ -116,8 +116,8 @@ func (l *dndUtilBotListener) worker(ctx context.Context, tasks <-chan *tgbotapi.
 			l.logger.Info("worker exits due to canceled context")
 			return
 		case update, ok := <-tasks:
-			l.logger.Info("worker exits due to rateLimit channel was closed")
 			if _, ok := <-rl; !ok { // rate limit
+				l.logger.Info("worker exits due to rateLimit channel was closed")
 				return
 			}
 			if !ok {
