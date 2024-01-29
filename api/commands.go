@@ -79,7 +79,7 @@ func initialize(newCommands *commands) {
 
 func (c *commands) findCommandByLabel(messageText string, commandsMap map[string]*command) (*command, bool) {
 	for _, command := range commandsMap {
-		if command.label == messageText {
+		if command.label != commandEmptyLabel && command.label == messageText {
 			return command, true
 		}
 	}
@@ -196,7 +196,11 @@ func (c *commands) Resolve(upd *tgbotapi.Update) *command {
 	if !ok {
 		cmd, ok = c.findCommandByLabel(upd.Message.Text, commandsMap)
 		if !ok {
-			return commandCanNotResolve
+			if commandKey == "" {
+				return commandCanNotResolve
+			} else {
+				return commandNotImplemented
+			}
 		}
 	}
 
@@ -230,10 +234,12 @@ func (buc *builtUpCommand) Execute(upd *tgbotapi.Update) error {
 func (c *command) newBuiltUpCommand(api *dndUtilBotApi) *builtUpCommand {
 	return &builtUpCommand{
 		handler: func(upd *tgbotapi.Update) error {
-			cached, ok := c.messageCache.Get(c.commandKey, upd.FromChat().ID)
-			if ok {
-				api.sendToChat(cached)
-				return nil
+			if c.messageCache != nil {
+				cached, ok := c.messageCache.Get(c.commandKey, upd.FromChat().ID)
+				if ok {
+					api.sendToChat(cached)
+					return nil
+				}
 			}
 
 			chattable, err := c.handler(api, upd)

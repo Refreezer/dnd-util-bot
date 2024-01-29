@@ -94,6 +94,7 @@ var (
 		handler:          handlerHelp,
 		needsAdminRights: true,
 		description:      "посмотреть команды",
+		label:            commandEmptyLabel,
 	}
 
 	// service commands
