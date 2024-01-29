@@ -112,6 +112,10 @@ func int64FromByteArr(arr []byte) int64 {
 }
 
 func (b *BoltStorage) MoveMoneyFromUserToUser(fromId int64, toId int64, amount uint) error {
+	if toId == fromId {
+		return api.ErrorInvalidTransactionParameters
+	}
+
 	err := b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(userIdToBalanceBucketKey)
 		fromIdKey := int64ToByteArr(fromId)

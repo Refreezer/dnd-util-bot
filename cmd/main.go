@@ -28,11 +28,11 @@ func (lp *loggerProvider) MustGetLogger(moduleName string) *logging.Logger {
 }
 
 func main() {
-	tgApiKey, timeout := parseEnvironmentVariables()
+	env := parseEnvironmentVariables()
 	debug := parseFlags()
-	validateConfiguration(debug, timeout)
+	validateConfiguration(debug, env.timeout)
 
-	tgBotApi, err := tgbotapi.NewBotAPI(tgApiKey)
+	tgBotApi, err := tgbotapi.NewBotAPI(env.tgApiKey)
 	if err != nil {
 		Logger.Fatalf("error while initializing telegram bot api %s", err)
 	}
@@ -52,6 +52,7 @@ func main() {
 				tgBotApi,
 				loggerProvider,
 				storage,
+				env.dndUtilBotName,
 			),
 		},
 		loggerProvider,
@@ -102,14 +103,26 @@ func parseFlags() bool {
 	return *debug
 }
 
-func parseEnvironmentVariables() (string, int) {
+type environment struct {
+	tgApiKey       string
+	dndUtilBotName string
+	timeout        int
+}
+
+func parseEnvironmentVariables() *environment {
 	tgApiKey := mustGetEnv(DndUtilTgApiKey)
+	dndUtilBotName := mustGetEnv(DndUtilBotName)
 	timeoutStr := mustGetEnv(DndUtilLongPollingTimeout)
 	timeout, err := strconv.Atoi(timeoutStr)
 	if err != nil {
 		Logger.Fatalf("timeout environment variable is invalid %s", timeoutStr)
 	}
-	return tgApiKey, timeout
+
+	return &environment{
+		tgApiKey,
+		dndUtilBotName,
+		timeout,
+	}
 }
 
 func mustGetEnv(key EnvKey) string {

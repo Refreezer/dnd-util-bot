@@ -86,13 +86,14 @@ func NewDndUtilApi(
 	tgBotApi *tgbotapi.BotAPI,
 	loggerProvider LoggerProvider,
 	storage Storage,
-	// resourceProvider ResourceProvider,
+	botName string,
 ) DndUtilApi {
 	return newDndUtilApi(
 		tgBotApi,
 		loggerProvider,
 		storage,
 		//resourceProvider,
+		botName,
 	)
 }
 
@@ -100,14 +101,14 @@ func newDndUtilApi(
 	tgBotApi *tgbotapi.BotAPI,
 	loggerProvider LoggerProvider,
 	storage Storage,
-	// resourceProvider ResourceProvider,
+	botName string,
 ) *dndUtilBotApi {
 	api := &dndUtilBotApi{
 		tgBotApi:   tgBotApi,
 		logger:     loggerProvider.MustGetLogger("dndUtilBotApi"),
 		storage:    storage,
 		randomizer: rand.New(rand.NewSource(time.Now().Unix())),
-		botName:    "DnDUtilTest_bot",
+		botName:    botName,
 		//resourceProvider: resourceProvider,
 	}
 
@@ -262,7 +263,7 @@ func (api *dndUtilBotApi) moveMoneyFromUserToUser(upd *tgbotapi.Update) (*tgbota
 	}
 
 	amount, err := strconv.Atoi(params[3])
-	if err != nil || amount == 0 {
+	if err != nil || amount <= 0 {
 		return nil, ErrorInvalidIntegerParameter
 	}
 
@@ -318,7 +319,7 @@ func (api *dndUtilBotApi) setUserBalance(upd *tgbotapi.Update) (*tgbotapi.Messag
 	}
 
 	amount, err := strconv.Atoi(params[2])
-	if err != nil {
+	if err != nil || amount < 0 {
 		return nil, ErrorInvalidIntegerParameter
 	}
 
@@ -433,7 +434,7 @@ func (api *dndUtilBotApi) sendMoney(upd *tgbotapi.Update) (*tgbotapi.MessageConf
 	}
 
 	amount, err := strconv.Atoi(params[2])
-	if err != nil {
+	if err != nil || amount <= 0 {
 		return nil, ErrorInvalidIntegerParameter
 	}
 

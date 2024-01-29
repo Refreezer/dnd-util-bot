@@ -120,8 +120,9 @@ func (l *dndUtilBotListener) worker(ctx context.Context, tasks <-chan *tgbotapi.
 
 			func() {
 				defer func() {
-					recover()
-					l.logger.Warning("recovered after update handler failed")
+					if r := recover(); r != nil {
+						l.logger.Warning("recovered after update handler failed %s", r)
+					}
 				}()
 
 				l.conf.UpdateHandler.Handle(ctx, update)
