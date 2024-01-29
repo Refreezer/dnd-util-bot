@@ -10,9 +10,7 @@ import (
 )
 
 var (
-	administrativeSeparator = []string{
-		"", administrativeCommandsSeparatorString, "",
-	}
+	administrativeSeparator = []string{administrativeCommandsSeparatorString, ""}
 )
 
 const (
@@ -136,6 +134,12 @@ func (c *commands) newHelpMessage(upd *tgbotapi.Update) *tgbotapi.MessageConfig 
 }
 
 func insertAdministrativeSeparator(commandUsagesWithRights []*KeyValue[string, bool]) []*KeyValue[string, bool] {
+	commandUsagesWithRights = slices.Insert(
+		commandUsagesWithRights,
+		0,
+		&KeyValue[string, bool]{key: userCommandsSeparatorString},
+	)
+
 	firstAdminIdx := 0
 	for i, val := range commandUsagesWithRights {
 		if val.value {

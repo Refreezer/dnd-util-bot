@@ -19,5 +19,6 @@ const (
 	errorMessageInvalidTransactionParameters = "Думаешь, что перехитрил меня 😠? Чтобы я такого больше не видел\\!"
 	errorMessageInvalidParametersFormat      = "Путник, кажется твои параметры неправильные ☹️\\. Смотри как надо:\n%s"
 
-	administrativeCommandsSeparatorString = "Административные команды:"
+	administrativeCommandsSeparatorString = "*Административные команды:*"
+	userCommandsSeparatorString           = "*Команды пользователя:*"
 )
