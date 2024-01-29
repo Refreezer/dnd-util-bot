@@ -192,6 +192,7 @@ func (api *dndUtilBotApi) executeCommand(upd *tgbotapi.Update) {
 	}
 
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
+	msg.ReplyToMessageID = upd.Message.MessageID
 	_, err = api.tgBotApi.Send(msg)
 	if err != nil {
 		api.logger.Errorf("couldn't send reply error message %s", err)
