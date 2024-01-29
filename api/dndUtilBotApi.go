@@ -132,7 +132,7 @@ func validateUsernameIsNotHidden(upd *tgbotapi.Update) error {
 }
 
 func (api *dndUtilBotApi) handleUpdate(upd *tgbotapi.Update) {
-	if upd.Message == nil || upd.Message.Chat == nil || upd.Message.From == nil {
+	if upd.Message == nil || upd.Message.From == nil {
 		return
 	}
 
@@ -209,7 +209,7 @@ func (api *dndUtilBotApi) executeCommand(upd *tgbotapi.Update) {
 func markdownMessage(chatId int64, messageId int, text string) *tgbotapi.MessageConfig {
 	msg := tgbotapi.NewMessage(chatId, text)
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
-	msg.ReplyToMessageID = messageId
+	msg.ReplyParameters.MessageID = messageId
 	return &msg
 }
 
@@ -241,7 +241,9 @@ func isAdmin(member *tgbotapi.ChatMember) bool {
 func (api *dndUtilBotApi) getMember(chatID int64, userID int64) (tgbotapi.ChatMember, error) {
 	member, err := api.tgBotApi.GetChatMember(tgbotapi.GetChatMemberConfig{
 		ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
-			ChatID: chatID,
+			ChatConfig: tgbotapi.ChatConfig{
+				ChatID: chatID,
+			},
 			UserID: userID,
 		},
 	})

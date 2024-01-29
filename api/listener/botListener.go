@@ -2,7 +2,7 @@ package listener
 
 import (
 	"context"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/op/go-logging"
 	"runtime"
 	"sync"

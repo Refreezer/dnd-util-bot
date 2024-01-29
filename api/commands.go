@@ -242,7 +242,8 @@ func (c *command) newBuiltUpCommand(api *dndUtilBotApi) *builtUpCommand {
 				}
 			}
 
-			chattable, err := c.handler(api, upd)
+			wrappedHandler := c.handler.setThreadIdForSuperGroup()
+			chattable, err := wrappedHandler(api, upd)
 			if err != nil {
 				api.logger.Errorf("error on executing command handler: %s", err)
 			}

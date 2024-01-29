@@ -5,8 +5,9 @@ import (
 )
 
 type markupProvider func(api *dndUtilBotApi, upd *tgbotapi.Update) *tgbotapi.ReplyKeyboardMarkup
+type baseChatModifier func(c *tgbotapi.BaseChat, api *dndUtilBotApi, upd *tgbotapi.Update)
 
-func (handler commandHandler) setReplyMarkup(markupProvider markupProvider) commandHandler {
+func wrapHandler(handler commandHandler, modifier baseChatModifier) commandHandler {
 	return func(api *dndUtilBotApi, upd *tgbotapi.Update) (tgbotapi.Chattable, error) {
 		msg, err := handler(api, upd)
 		if err != nil {
@@ -15,30 +16,35 @@ func (handler commandHandler) setReplyMarkup(markupProvider markupProvider) comm
 
 		switch v := msg.(type) {
 		case *tgbotapi.MessageConfig:
-			v.ReplyMarkup = markupProvider(api, upd)
+			modifier(&v.BaseChat, api, upd)
 		case *tgbotapi.StickerConfig:
-			v.ReplyMarkup = markupProvider(api, upd)
+			modifier(&v.BaseChat, api, upd)
 		}
 		return msg, nil
 	}
 }
 
+func (handler commandHandler) setReplyMarkup(markupProvider markupProvider) commandHandler {
+	return wrapHandler(handler, func(c *tgbotapi.BaseChat, api *dndUtilBotApi, upd *tgbotapi.Update) {
+		c.ReplyMarkup = markupProvider(api, upd)
+	})
+}
+
 func (handler commandHandler) setReplyToMessageID() commandHandler {
-	return func(api *dndUtilBotApi, upd *tgbotapi.Update) (tgbotapi.Chattable, error) {
-		msg, err := handler(api, upd)
-		if err != nil {
-			return nil, err
+	return wrapHandler(handler, func(c *tgbotapi.BaseChat, api *dndUtilBotApi, upd *tgbotapi.Update) {
+		c.ReplyParameters.MessageID = upd.Message.MessageID
+	})
+}
+
+func (handler commandHandler) setThreadIdForSuperGroup() commandHandler {
+	return wrapHandler(handler, func(c *tgbotapi.BaseChat, api *dndUtilBotApi, upd *tgbotapi.Update) {
+		chatType := upd.FromChat().Type
+		if chatType != ChatTypeSuperGroup {
+			return
 		}
 
-		switch v := msg.(type) {
-		case *tgbotapi.MessageConfig:
-			v.ReplyToMessageID = upd.Message.MessageID
-		case *tgbotapi.StickerConfig:
-			v.ReplyToMessageID = upd.Message.MessageID
-		}
-
-		return msg, nil
-	}
+		c.MessageThreadID = upd.Message.MessageThreadID
+	})
 }
 
 var (
