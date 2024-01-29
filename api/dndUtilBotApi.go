@@ -150,16 +150,14 @@ func (api *dndUtilBotApi) handleUpdate(upd *tgbotapi.Update) {
 
 func (api *dndUtilBotApi) registerWalletIfNeeded(chatId int64, from *tgbotapi.User) {
 	_, mappingRegistered := api.getIdByUserNameSanitized(from.UserName)
-	api.logger.Debugf("registerWalletIfNeeded : mappingRegistered=%v", mappingRegistered)
 	if !mappingRegistered {
 		err := api.storage.SaveUserNameToUserIdMapping(from.UserName, from.ID)
 		if err != nil {
-			api.logger.Errorf("couldn't save user id mapping for %v", from)
+			api.logger.Errorf("couldn't save user id mapping for %+v", from)
 		}
 	}
 
 	isRegistered, err := api.storage.IsRegistered(chatId, from.ID)
-	api.logger.Debugf("registerWalletIfNeeded : isRegistered=%v, err=%s", isRegistered, err)
 	if err != nil {
 		api.logger.Errorf("couldn't know if user is registered for chatID=%d username=%s", chatId, from.UserName)
 	}
@@ -224,6 +222,10 @@ func (api *dndUtilBotApi) sendToChat(chatable tgbotapi.Chattable) {
 }
 
 func (api *dndUtilBotApi) isRelatedMemberAdmin(upd *tgbotapi.Update) (bool, error) {
+	if upd.FromChat().Type == ChatTypePrivate {
+		return true, nil
+	}
+
 	member, err := api.getMember(upd.Message.Chat.ID, upd.Message.From.ID)
 	if err != nil {
 		return false, err
