@@ -112,7 +112,7 @@ func newDndUtilApi(
 		//resourceProvider: resourceProvider,
 	}
 
-	api.commands = newCommands(api)
+	api.commands = newCommands(api, chatTypeToCommandMap)
 	return api
 }
 
@@ -174,8 +174,8 @@ func (api *dndUtilBotApi) registerWalletIfNeeded(chatId int64, from *tgbotapi.Us
 }
 
 func (api *dndUtilBotApi) executeCommand(upd *tgbotapi.Update) {
-	cmd := api.commands.resolve(upd)
-	err := cmd.build(api).execute(upd)
+	cmd := api.commands.Resolve(upd)
+	err := cmd.Build(api).Execute(upd)
 	if err == nil {
 		return
 	}
@@ -183,17 +183,17 @@ func (api *dndUtilBotApi) executeCommand(upd *tgbotapi.Update) {
 	var msg *tgbotapi.MessageConfig
 	chatID := upd.FromChat().ID
 	if errors.Is(err, ErrorInvalidParameters) {
-		msg = api.plainMessage(chatID, fmt.Sprintf(errorMessageInvalidParametersFormat, cmd.usage))
+		msg = plainMessage(chatID, fmt.Sprintf(errorMessageInvalidParametersFormat, cmd.usage))
 	} else if errors.Is(err, ErrorInvalidIntegerParameter) {
-		msg = api.plainMessage(chatID, errorMessageInvalidIntegerParameter)
+		msg = plainMessage(chatID, errorMessageInvalidIntegerParameter)
 	} else if errors.Is(err, ErrorInvalidTransactionParameters) {
-		msg = api.plainMessage(chatID, errorMessageInvalidTransactionParameters)
+		msg = plainMessage(chatID, errorMessageInvalidTransactionParameters)
 	} else if errors.Is(err, ErrorInsufficientMoney) {
-		msg = api.plainMessage(chatID, errorMessageInsufficientPounds)
+		msg = plainMessage(chatID, errorMessageInsufficientPounds)
 	} else if errors.Is(err, ErrorBalanceOverflow) {
-		msg = api.plainMessage(chatID, errorMessageBalanceOverflow)
+		msg = plainMessage(chatID, errorMessageBalanceOverflow)
 	} else if errors.Is(err, ErrorUsernameHidden) {
-		msg = api.plainMessage(chatID, messageUsernameHidden)
+		msg = plainMessage(chatID, messageUsernameHidden)
 	}
 
 	if msg == nil {
@@ -208,18 +208,8 @@ func (api *dndUtilBotApi) executeCommand(upd *tgbotapi.Update) {
 	}
 }
 
-func (api *dndUtilBotApi) plainMessage(chatId int64, text string) *tgbotapi.MessageConfig {
+func plainMessage(chatId int64, text string) *tgbotapi.MessageConfig {
 	msg := tgbotapi.NewMessage(chatId, text)
-	return &msg
-}
-
-func (api *dndUtilBotApi) messageRightsViolation(upd *tgbotapi.Update) *tgbotapi.MessageConfig {
-	msg := tgbotapi.NewMessage(upd.Message.Chat.ID, messageRejectedRightsViolation)
-	return &msg
-}
-
-func (api *dndUtilBotApi) messageNotImplemented(upd *tgbotapi.Update) *tgbotapi.MessageConfig {
-	msg := tgbotapi.NewMessage(upd.Message.Chat.ID, messageNotImplemented)
 	return &msg
 }
 
@@ -479,14 +469,6 @@ func (api *dndUtilBotApi) messageSendMoney(upd *tgbotapi.Update, amount int, fro
 		fmt.Sprintf(messageSendMoney, amount, fmt.Sprintf("@%s", from), to),
 	)
 	return &msg
-}
-
-func (api *dndUtilBotApi) notImplemented(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
-	return api.messageNotImplemented(upd), nil
-}
-
-func (api *dndUtilBotApi) rightsViolation(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
-	return api.messageRightsViolation(upd), nil
 }
 
 func (api *dndUtilBotApi) start(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {

@@ -71,11 +71,11 @@ var (
 	}
 
 	handlerNotImplemented commandHandler = func(api *dndUtilBotApi, upd *tgbotapi.Update) (tgbotapi.Chattable, error) {
-		return api.notImplemented(upd)
+		return notImplemented(upd)
 	}
 
 	handlerRightsViolation commandHandler = func(api *dndUtilBotApi, upd *tgbotapi.Update) (tgbotapi.Chattable, error) {
-		return api.rightsViolation(upd)
+		return rightsViolation(upd)
 	}
 
 	handlerCantResolve commandHandler = func(_ *dndUtilBotApi, _ *tgbotapi.Update) (tgbotapi.Chattable, error) {
@@ -84,5 +84,9 @@ var (
 
 	handlerStart commandHandler = func(api *dndUtilBotApi, upd *tgbotapi.Update) (tgbotapi.Chattable, error) {
 		return api.start(upd)
+	}
+
+	handlerHelp commandHandler = func(api *dndUtilBotApi, upd *tgbotapi.Update) (tgbotapi.Chattable, error) {
+		return api.commands.printHelp(upd)
 	}
 )
