@@ -125,7 +125,7 @@ func (b *BoltStorage) MoveMoneyFromUserToUser(chatId int64, fromId int64, toId i
 			return fmt.Errorf("error while MoveMoneyFromUserToUser (sender) %w", api.ErrorNotRegistered)
 		}
 
-		toKey := balanceBucketKey(chatId, fromId)
+		toKey := balanceBucketKey(chatId, toId)
 		toBalanceBytes := bucket.Get(toKey)
 		if toBalanceBytes == nil {
 			return fmt.Errorf("error while MoveMoneyFromUserToUser (recepient) %w", api.ErrorNotRegistered)
