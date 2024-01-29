@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/Refreezer/dnd-util-bot/api"
@@ -17,9 +18,18 @@ import (
 	"syscall"
 )
 
-type loggerProvider struct {
-	Debug bool
-}
+type (
+	loggerProvider struct {
+		Debug bool
+	}
+	Environment struct {
+		tgApiKey       string
+		DndUtilBotName string `json:"dndUtilBotName"`
+		Timeout        int    `json:"timeout"`
+		RateLimitRps   int    `json:"rateLimitRps"`
+		DBname         string `json:"DBname"`
+	}
+)
 
 func (lp *loggerProvider) MustGetLogger(moduleName string) *logging.Logger {
 	logger := logging.MustGetLogger(moduleName)
@@ -29,8 +39,10 @@ func (lp *loggerProvider) MustGetLogger(moduleName string) *logging.Logger {
 
 func main() {
 	env := parseEnvironmentVariables()
+	envJson, _ := json.MarshalIndent(&env, "", "    ")
+	Logger.Infof("Environment: %s", envJson)
 	debug := parseFlags()
-	validateConfiguration(debug, env.timeout)
+	validateConfiguration(debug, env.Timeout)
 
 	tgBotApi, err := tgbotapi.NewBotAPI(env.tgApiKey)
 	if err != nil {
@@ -40,19 +52,20 @@ func main() {
 	loggerProvider := &loggerProvider{
 		Debug: debug,
 	}
-	storage, disposeStorage := boltStorage.NewBoltStorage(loggerProvider)
+	storage, disposeStorage := boltStorage.NewBoltStorage(loggerProvider, env.DBname)
 	defer disposeStorage()
 
 	botListener := listener.NewBotListener(
 		tgBotApi,
 		&listener.Config{
-			Timeout:        2,
+			RateLimitRps:   100,
+			TgTimeout:      2,
 			AllowedUpdates: []string{tgbotapi.UpdateTypeMessage},
 			UpdateHandler: api.NewDndUtilApi(
 				tgBotApi,
 				loggerProvider,
 				storage,
-				env.dndUtilBotName,
+				env.DndUtilBotName,
 			),
 		},
 		loggerProvider,
@@ -92,7 +105,7 @@ func listenOsSignals(signalChannel chan os.Signal, cancel context.CancelFunc) {
 
 func validateConfiguration(debug bool, timeout int) {
 	if !debug && timeout == 0 {
-		Logger.Fatal("timeout can't be zero in production mode")
+		Logger.Fatal("Timeout can't be zero in production mode")
 	}
 }
 
@@ -103,25 +116,30 @@ func parseFlags() bool {
 	return *debug
 }
 
-type environment struct {
-	tgApiKey       string
-	dndUtilBotName string
-	timeout        int
-}
-
-func parseEnvironmentVariables() *environment {
+func parseEnvironmentVariables() *Environment {
 	tgApiKey := mustGetEnv(DndUtilTgApiKey)
 	dndUtilBotName := mustGetEnv(DndUtilBotName)
-	timeoutStr := mustGetEnv(DndUtilLongPollingTimeout)
+	dbname := mustGetEnv(DndUtilDbPath)
+	timeoutStr := os.Getenv(string(DndUtilLongPollingTimeout))
 	timeout, err := strconv.Atoi(timeoutStr)
 	if err != nil {
-		Logger.Fatalf("timeout environment variable is invalid %s", timeoutStr)
+		Logger.Errorf("%s Environment variable is invalid %s. use 60", DndUtilLongPollingTimeout, timeoutStr)
+		timeout = 60
 	}
 
-	return &environment{
+	rateLimitRpsStr := os.Getenv(string(DndUtilRateLimitRps))
+	rateLimitRps, err := strconv.Atoi(rateLimitRpsStr)
+	if err != nil {
+		Logger.Errorf("%s Environment variable is invalid %s. use 100", DndUtilRateLimitRps, timeoutStr)
+		rateLimitRps = 100
+	}
+
+	return &Environment{
 		tgApiKey,
 		dndUtilBotName,
 		timeout,
+		rateLimitRps,
+		dbname,
 	}
 }
 

@@ -5,16 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Refreezer/dnd-util-bot/api"
-	"github.com/Refreezer/dnd-util-bot/internal"
 	"github.com/boltdb/bolt"
 	"github.com/op/go-logging"
 	"math"
-	"os"
 	"time"
-)
-
-var (
-	DBName = os.Getenv(string(internal.DndUtilDbPath))
 )
 
 var (
@@ -42,10 +36,10 @@ func (b *BoltStorage) IsRegistered(chatId int64, userId int64) (bool, error) {
 	return ok, err
 }
 
-func NewBoltStorage(provider api.LoggerProvider) (storage *BoltStorage, close func()) {
+func NewBoltStorage(provider api.LoggerProvider, dbName string) (storage *BoltStorage, close func()) {
 	logger := provider.MustGetLogger("boltStorage")
-	logger.Infof("Db path is %s", DBName)
-	db, err := bolt.Open(DBName, 0600, &bolt.Options{Timeout: 1 * time.Second})
+	logger.Debugf("Db path is %s", dbName)
+	db, err := bolt.Open(dbName, 0600, &bolt.Options{Timeout: 1 * time.Second})
 	Init(db, logger)
 	if err != nil {
 		logger.Fatalf("error while opening db connection %s", err)

@@ -6,6 +6,7 @@ import (
 	"github.com/op/go-logging"
 	"runtime"
 	"sync"
+	"time"
 )
 
 type (
@@ -19,7 +20,8 @@ type (
 	}
 
 	Config struct {
-		Timeout        int
+		RateLimitRps   int
+		TgTimeout      int
 		AllowedUpdates []string
 		UpdateHandler  UpdateHandler
 	}
@@ -28,7 +30,6 @@ type (
 		conf           *Config
 		tgBotApi       *tgbotapi.BotAPI
 		lastUpdateId   int
-		timeout        int
 		updatesChannel tgbotapi.UpdatesChannel
 		done           chan struct{}
 		logger         *logging.Logger
@@ -57,14 +58,15 @@ func NewBotListener(
 func (l *dndUtilBotListener) ListenForUpdates(ctx context.Context) (ShutDown, error) {
 	updates := l.tgBotApi.GetUpdatesChan(tgbotapi.UpdateConfig{
 		Offset:         l.lastUpdateId + 1,
-		Timeout:        l.conf.Timeout,
+		Timeout:        l.conf.TgTimeout,
 		AllowedUpdates: l.conf.AllowedUpdates,
 	})
 
 	l.updatesChannel = updates
 	tasks := make(chan *tgbotapi.Update, runtime.NumCPU())
 	go l.eventLoop(ctx, tasks)
-	l.startWorkers(ctx, tasks)
+	rl := l.rateLimit(ctx)
+	l.startWorkers(ctx, tasks, rl)
 	return l.waitForShutDown(), nil
 }
 
@@ -77,6 +79,7 @@ func (l *dndUtilBotListener) waitForShutDown() func() {
 func (l *dndUtilBotListener) eventLoop(ctx context.Context, tasks chan<- *tgbotapi.Update) {
 	defer func() {
 		l.done <- struct{}{}
+		close(tasks)
 	}()
 
 	wg := sync.WaitGroup{}
@@ -100,19 +103,23 @@ func (l *dndUtilBotListener) eventLoop(ctx context.Context, tasks chan<- *tgbota
 	}
 }
 
-func (l *dndUtilBotListener) startWorkers(ctx context.Context, tasks <-chan *tgbotapi.Update) {
+func (l *dndUtilBotListener) startWorkers(ctx context.Context, tasks <-chan *tgbotapi.Update, rl <-chan struct{}) {
 	for i := 0; i <= runtime.NumCPU(); i++ {
-		go l.worker(ctx, tasks)
+		go l.worker(ctx, tasks, rl)
 	}
 }
 
-func (l *dndUtilBotListener) worker(ctx context.Context, tasks <-chan *tgbotapi.Update) {
+func (l *dndUtilBotListener) worker(ctx context.Context, tasks <-chan *tgbotapi.Update, rl <-chan struct{}) {
 	for {
 		select {
 		case <-ctx.Done():
 			l.logger.Info("worker exits due to canceled context")
 			return
 		case update, ok := <-tasks:
+			l.logger.Info("worker exits due to rateLimit channel was closed")
+			if _, ok := <-rl; !ok { // rate limit
+				return
+			}
 			if !ok {
 				l.logger.Info("worker exits due to input channel was closed")
 				return
@@ -130,4 +137,24 @@ func (l *dndUtilBotListener) worker(ctx context.Context, tasks <-chan *tgbotapi.
 			continue
 		}
 	}
+}
+
+func (l *dndUtilBotListener) rateLimit(ctx context.Context) <-chan struct{} {
+	tokenRateMs := 1000 / l.conf.RateLimitRps
+	rl := make(chan struct{}, l.conf.RateLimitRps)
+	go func(ctx context.Context, tokens chan<- struct{}) {
+		defer close(tokens)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case tokens <- struct{}{}:
+				time.Sleep(time.Millisecond * time.Duration(tokenRateMs))
+				continue
+			}
+		}
+
+	}(ctx, rl)
+
+	return rl
 }
