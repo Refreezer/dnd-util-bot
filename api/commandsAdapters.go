@@ -43,7 +43,7 @@ func (handler commandHandler) setReplyToMessageID() commandHandler {
 
 var (
 	handlerMoveMoneyFromUserToUser commandHandler = func(api *dndUtilBotApi, upd *tgbotapi.Update) (tgbotapi.Chattable, error) {
-		return api.moveMoneyFromUserToUser(upd)
+		return api.Transaction(upd)
 	}
 
 	handlerSetUserBalance commandHandler = func(api *dndUtilBotApi, upd *tgbotapi.Update) (tgbotapi.Chattable, error) {

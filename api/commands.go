@@ -127,7 +127,7 @@ func (c *commands) newHelpMessage(upd *tgbotapi.Update) *tgbotapi.MessageConfig 
 
 	commandUsagesWithRights = insertAdministrativeSeparator(commandUsagesWithRights)
 	messageText := getUsageMessageText(commandUsagesWithRights)
-	msg := plainMessage(chat.ID, messageText)
+	msg := markdownMessage(chat.ID, upd.Message.MessageID, messageText)
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
 	c.messageCache.Put(commandKeyHelp, chat.ID, msg)
 	return msg
