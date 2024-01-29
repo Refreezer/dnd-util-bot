@@ -18,13 +18,13 @@ var (
 const (
 	commandKeyHelp                    = "help"
 	commandKeyStart                   = "start"
-	commandKeySendMoney               = "send_money"
-	commandKeySendMoneyPrompt         = "send_money_prompt"
-	commandKeyGetBalance              = "get_balance"
-	commandKeyThrowDice               = "throw_dice"
-	commandKeyGetUserBalance          = "get_user_balance"
-	commandKeySetUserBalance          = "set_user_balance"
-	commandKeyMoveMoneyFromUserToUser = "move_money_from_user_to_user"
+	commandKeySendMoney               = "send"
+	commandKeySendMoneyPrompt         = "send_prompt"
+	commandKeyGetBalance              = "balance"
+	commandKeyThrowDice               = "dice"
+	commandKeyGetUserBalance          = "get_balance"
+	commandKeySetUserBalance          = "set_balance"
+	commandKeyMoveMoneyFromUserToUser = "transaction"
 )
 
 type (
