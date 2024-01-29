@@ -99,11 +99,11 @@ var (
 
 	// service commands
 	commandNotImplemented = &command{
-		handler: handlerNotImplemented.setReplyMarkup(mainMenu),
+		handler: handlerNotImplemented.setReplyMarkup(mainMenu).setReplyToMessageID(),
 		label:   commandEmptyLabel,
 	}
 	commandRightsViolation = &command{
-		handler: handlerRightsViolation.setReplyMarkup(mainMenu),
+		handler: handlerRightsViolation.setReplyMarkup(mainMenu).setReplyToMessageID(),
 		label:   commandEmptyLabel,
 	}
 	commandCanNotResolve = &command{
