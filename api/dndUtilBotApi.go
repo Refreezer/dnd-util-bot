@@ -149,6 +149,7 @@ func (api *dndUtilBotApi) handleUpdate(upd *tgbotapi.Update) {
 
 func (api *dndUtilBotApi) registerWalletIfNeeded(chatId int64, from *tgbotapi.User) {
 	_, mappingRegistered := api.getIdByUserNameSanitized(from.UserName)
+	api.logger.Infof("registerWalletIfNeeded : mappingRegistered=%v", mappingRegistered)
 	if !mappingRegistered {
 		err := api.storage.SaveUserNameToUserIdMapping(from.UserName, from.ID)
 		if err != nil {
@@ -157,6 +158,7 @@ func (api *dndUtilBotApi) registerWalletIfNeeded(chatId int64, from *tgbotapi.Us
 	}
 
 	isRegistered, err := api.storage.IsRegistered(chatId, from.ID)
+	api.logger.Infof("registerWalletIfNeeded : isRegistered=%v, err=%s", isRegistered, err)
 	if err != nil {
 		api.logger.Errorf("couldn't know if user is registered for chatID=%d username=%s", chatId, from.UserName)
 	}
@@ -494,9 +496,9 @@ func (api *dndUtilBotApi) start(upd *tgbotapi.Update) (*tgbotapi.MessageConfig, 
 	}
 
 	chat := upd.FromChat()
-	balance, err := api.storage.GetUserBalance(upd.SentFrom().ID, upd.SentFrom().ID)
+	balance, err := api.storage.GetUserBalance(upd.FromChat().ID, upd.SentFrom().ID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error while start: %w", err)
 	}
 
 	msg := tgbotapi.NewMessage(chat.ID, fmt.Sprintf(messageStart, balance))

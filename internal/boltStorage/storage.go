@@ -3,6 +3,7 @@ package boltStorage
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"github.com/Refreezer/dnd-util-bot/api"
 	"github.com/Refreezer/dnd-util-bot/internal"
 	"github.com/boltdb/bolt"
@@ -127,13 +128,13 @@ func (b *BoltStorage) MoveMoneyFromUserToUser(chatId int64, fromId int64, toId i
 		fromKey := balanceBucketKey(chatId, fromId)
 		fromBalanceBytes := bucket.Get(fromKey)
 		if fromBalanceBytes == nil {
-			return api.ErrorNotRegistered
+			return fmt.Errorf("error while MoveMoneyFromUserToUser (sender) %w", api.ErrorNotRegistered)
 		}
 
 		toKey := balanceBucketKey(chatId, fromId)
 		toBalanceBytes := bucket.Get(toKey)
 		if toBalanceBytes == nil {
-			return api.ErrorNotRegistered
+			return fmt.Errorf("error while MoveMoneyFromUserToUser (recepient) %w", api.ErrorNotRegistered)
 		}
 
 		fromBalance := uintFromByteArr(fromBalanceBytes)
@@ -190,7 +191,7 @@ func (b *BoltStorage) GetUserBalance(chatId int64, userId int64) (uint, error) {
 		userKey := balanceBucketKey(chatId, userId)
 		balanceBytes := bucket.Get(userKey)
 		if balanceBytes == nil {
-			return api.ErrorNotRegistered
+			return fmt.Errorf("error while GetUserBalance %w", api.ErrorNotRegistered)
 		}
 
 		balance = uintFromByteArr(balanceBytes)
@@ -209,7 +210,7 @@ func (b *BoltStorage) GetIdByUserName(userName string) (userId int64, ok bool) {
 		bucket := tx.Bucket(userNameToUserIdBucketKey)
 		userIdBytes := bucket.Get([]byte(userName))
 		if userIdBytes == nil {
-			return api.ErrorNotRegistered
+			return fmt.Errorf("error while GetIdByUserName %w", api.ErrorNotRegistered)
 		}
 
 		userId = int64FromByteArr(userIdBytes)

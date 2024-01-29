@@ -124,7 +124,7 @@ func (c *command) newBuiltUpCommand(api *dndUtilBotApi) *builtUpCommand {
 		handler: func(upd *tgbotapi.Update) error {
 			chatable, err := c.handler(api, upd)
 			if err != nil {
-				api.logger.Errorf("error on executing command handler %s", err)
+				api.logger.Errorf("error on executing command handler: %s", err)
 			}
 
 			if chatable != nil {
